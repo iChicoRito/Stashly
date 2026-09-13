@@ -1,0 +1,82 @@
+/*
+label: TikTok
+value: tiktok
+*/
+
+:root[data-theme-preset="tiktok"] {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2123 0.022 276.3702);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2123 0.022 276.3702);
+  --primary: oklch(0.6473 0.2381 17.7125);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9604 0.0011 197.1384);
+  --secondary-foreground: oklch(0.2123 0.022 276.3702);
+  --muted: oklch(0.9791 0 0);
+  --muted-foreground: oklch(0.2123 0.022 276.3702);
+  --accent: oklch(0.8758 0.1461 191.5674);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.6473 0.2381 17.7125);
+  --border: oklch(1 0 0);
+  --input: #d4d4d8;
+  --ring: oklch(0.6473 0.2381 17.7125);
+  --chart-1: oklch(0.6473 0.2381 17.7125);
+  --chart-2: oklch(0.8758 0.1461 191.5674);
+  --chart-3: oklch(0.2123 0.022 276.3702);
+  --chart-4: oklch(0.7162 0.1805 13.8291);
+  --chart-5: oklch(0.6946 0.12 189.8571);
+  --sidebar: oklch(0.9791 0 0);
+  --sidebar-foreground: oklch(0.2123 0.022 276.3702);
+  --sidebar-primary: oklch(0.6473 0.2381 17.7125);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9584 0.0013 286.3749);
+  --sidebar-accent-foreground: oklch(0.2123 0.022 276.3702);
+  --sidebar-border: oklch(0.2123 0.022 276.3702);
+  --sidebar-ring: oklch(0.6473 0.2381 17.7125);
+
+  /* Shadows are mode-independent in this preset, so the dark block does not repeat them. */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+}
+
+.dark:root[data-theme-preset="tiktok"] {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.1822 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.2393 0 0);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(0.6473 0.2381 17.7125);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.8758 0.1461 191.5674);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.2002 0 0);
+  --muted-foreground: oklch(1 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.6473 0.2381 17.7125);
+  --border: oklch(0 0 0);
+  --input: oklch(0.2393 0 0);
+  --ring: oklch(0.6473 0.2381 17.7125);
+  --chart-1: oklch(0.6473 0.2381 17.7125);
+  --chart-2: oklch(0.8758 0.1461 191.5674);
+  --chart-3: oklch(1 0 0);
+  --chart-4: #ff6b81;
+  --chart-5: oklch(0.6946 0.12 189.8571);
+  --sidebar: oklch(0.1822 0 0);
+  --sidebar-foreground: oklch(1 0 0);
+  --sidebar-primary: oklch(0.6473 0.2381 17.7125);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.2393 0 0);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(1 0 0);
+  --sidebar-ring: oklch(0.6473 0.2381 17.7125);
+}

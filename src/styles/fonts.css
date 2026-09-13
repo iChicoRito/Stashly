@@ -1,0 +1,86 @@
+/*
+ * Fonts are self-hosted so the desktop build needs no network access at
+ * runtime. @fontsource ships the same
+ * families as woff2, and each class below sets the CSS variable that
+ * `globals.css` reads through `html[data-font="…"] body`.
+ */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/noto-sans";
+@import "@fontsource-variable/roboto";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/outfit";
+@import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/dm-sans";
+@import "@fontsource-variable/nunito-sans";
+@import "@fontsource-variable/figtree";
+@import "@fontsource-variable/raleway";
+@import "@fontsource-variable/public-sans";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/noto-serif";
+@import "@fontsource-variable/roboto-slab";
+@import "@fontsource-variable/merriweather";
+@import "@fontsource-variable/lora";
+@import "@fontsource-variable/playfair-display";
+
+/* Geist Pixel Square has no @fontsource package, so it is served from public/. */
+@font-face {
+  font-family: "Geist Pixel Square";
+  src: url("/fonts/GeistPixel-Square.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+
+.font-inter {
+  --font-inter: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-noto-sans {
+  --font-noto-sans: "Noto Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-roboto {
+  --font-roboto: "Roboto Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-geist {
+  --font-geist: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-outfit {
+  --font-outfit: "Outfit Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-geist-mono {
+  --font-geist-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.font-dm-sans {
+  --font-dm-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-nunito-sans {
+  --font-nunito-sans: "Nunito Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-figtree {
+  --font-figtree: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-raleway {
+  --font-raleway: "Raleway Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-public-sans {
+  --font-public-sans: "Public Sans Variable", ui-sans-serif, system-ui, sans-serif;
+}
+.font-jetbrains-mono {
+  --font-jetbrains-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.font-noto-serif {
+  --font-noto-serif: "Noto Serif Variable", ui-serif, Georgia, serif;
+}
+.font-roboto-slab {
+  --font-roboto-slab: "Roboto Slab Variable", ui-serif, Georgia, serif;
+}
+.font-merriweather {
+  --font-merriweather: "Merriweather Variable", ui-serif, Georgia, serif;
+}
+.font-lora {
+  --font-lora: "Lora Variable", ui-serif, Georgia, serif;
+}
+.font-playfair-display {
+  --font-playfair-display: "Playfair Display Variable", ui-serif, Georgia, serif;
+}
+.font-geist-pixel-square {
+  --font-geist-pixel-square: "Geist Pixel Square", "Geist Mono Variable", ui-monospace, monospace;
+}

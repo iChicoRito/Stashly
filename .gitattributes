@@ -1,0 +1,4 @@
+package.json text eol=lf
+biome.json text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf

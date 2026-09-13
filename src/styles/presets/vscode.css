@@ -1,0 +1,85 @@
+/*
+label: VS Code
+value: vscode
+*/
+
+:root[data-theme-preset="vscode"] {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.3211 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.3211 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.3211 0 0);
+  --primary: oklch(0.5296 0.1506 255.1121);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.9612 0 0);
+  --secondary-foreground: oklch(0.3211 0 0);
+  --muted: oklch(0.9612 0 0);
+  --muted-foreground: oklch(0.5486 0 0);
+  --accent: oklch(0.9197 0.0197 260.1694);
+  --accent-foreground: oklch(0.3211 0 0);
+  --destructive: oklch(0.5297 0.1995 25.054);
+  --border: oklch(0.9097 0 0);
+  --input: oklch(0.8514 0 0);
+  --ring: oklch(0.5296 0.1506 255.1121);
+  --chart-1: oklch(0.458 0.2925 264.2078);
+  --chart-2: oklch(0.4989 0.1497 140.0411);
+  --chart-3: oklch(0.4502 0.0797 80.6995);
+  --chart-4: oklch(0.4107 0.1678 27.8668);
+  --chart-5: oklch(0.4682 0.2257 319.1337);
+  --sidebar: oklch(0.9612 0 0);
+  --sidebar-foreground: oklch(0.3211 0 0);
+  --sidebar-primary: oklch(0.5296 0.1506 255.1121);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.9197 0.0197 260.1694);
+  --sidebar-accent-foreground: oklch(0.3211 0 0);
+  --sidebar-border: oklch(0.9097 0 0);
+  --sidebar-ring: oklch(0.5296 0.1506 255.1121);
+
+  /* Shadows are mode-independent in this preset, so the dark block does not repeat them. */
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 4px 6px -1px hsl(0 0% 0% / 0.1);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.1), 0 8px 10px -1px hsl(0 0% 0% / 0.1);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+}
+
+.dark:root[data-theme-preset="vscode"] {
+  /* The upstream theme squares off every corner in dark mode only. */
+  --radius: 0rem;
+  --background: oklch(0.2221 0 0);
+  --foreground: oklch(0.8514 0 0);
+  --card: oklch(0.2393 0 0);
+  --card-foreground: oklch(0.8514 0 0);
+  --popover: oklch(0.2393 0 0);
+  --popover-foreground: oklch(0.8514 0 0);
+  --primary: oklch(0.5296 0.1506 255.1121);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.3012 0 0);
+  --secondary-foreground: oklch(0.8514 0 0);
+  --muted: oklch(0.2686 0 0);
+  --muted-foreground: oklch(0.5999 0 0);
+  --accent: oklch(0.2704 0.0094 248.1761);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6208 0.19 25.2225);
+  --border: oklch(0.3407 0 0);
+  --input: oklch(0.3407 0 0);
+  --ring: oklch(0.5296 0.1506 255.1121);
+  --chart-1: oklch(0.6703 0.1201 249.7234);
+  --chart-2: oklch(0.7393 0.1199 174.8272);
+  --chart-3: oklch(0.8501 0.0698 105.0723);
+  --chart-4: oklch(0.701 0.0999 49.9996);
+  --chart-5: oklch(0.6505 0.1394 319.7049);
+  --sidebar: oklch(0.2393 0 0);
+  --sidebar-foreground: oklch(0.8514 0 0);
+  --sidebar-primary: oklch(0.5296 0.1506 255.1121);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.2704 0.0094 248.1761);
+  --sidebar-accent-foreground: oklch(1 0 0);
+  --sidebar-border: oklch(0.2603 0 0);
+  --sidebar-ring: oklch(0.5296 0.1506 255.1121);
+}
