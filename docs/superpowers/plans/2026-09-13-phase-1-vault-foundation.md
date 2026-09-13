@@ -272,7 +272,7 @@ Folds dependency install, IPC wrapper, and its test into one reviewable unit.
       tauri::Builder::default()
           .setup(|app| {
               let root = app.path().app_data_dir()?;      // D2: verified, not assumed (Task 5)
-              let paths = VaultPaths::resolve(&root);
+              let paths = vault_paths::resolve(&root);
               paths.ensure()?;
               let conn = db::open(&paths.db)?;
               db::migrate(&conn)?;
