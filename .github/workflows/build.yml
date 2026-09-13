@@ -75,10 +75,26 @@ jobs:
         run: npm test
 
       # SCOPED ON PURPOSE — do NOT "fix" this into a bare `npx biome check`.
-      # The repo-wide run is currently RED on pre-existing src/app/(template)/** lint
-      # debt (2 errors, 19 warnings) that Phase 1 does not own and must not be blocked
-      # on. This step names exactly the directories Phase 1 created or changed. Widen
-      # the list as later phases adopt the files they touch; replacing it with a
+      #
+      # The repo-wide run is RED on pre-existing src/app/(template)/** lint debt that
+      # Phase 1 does not own and must not be blocked on: on this branch tip, a bare
+      # `npx biome check src/app` reports 1 error, 19 warnings and 4 infos over 216 files
+      # and exits 1. Nor can the scope be widened to `src/app` or `src/components` as a
+      # whole, which would pull that debt back in through directories this phase never
+      # touched.
+      #
+      # So the step names Phase 1's directories PLUS the Phase 1 files that cannot be
+      # included as whole directories: `src/app/(app)`, `src/router.tsx` and
+      # `src/app/not-found.tsx` were created or rewritten by this phase while their
+      # siblings in `src/app/(template)/**` were not, and the one template file this
+      # phase did change (a brand-link fix in app-sidebar.tsx) is therefore named on its
+      # own. Without these explicit paths CI could pass while this phase's own pages,
+      # routing and navigation regressed.
+      #
+      # The parenthesised paths are quoted because the default shell on the GitHub
+      # Windows runner is PowerShell, where bare parentheses are metacharacters.
+      #
+      # Widen the list as later phases adopt the files they touch; replacing it with a
       # repo-wide run turns CI red on debt this phase did not create.
       - name: Lint (Phase 1 scope)
         run: >-
@@ -90,6 +106,14 @@ jobs:
           src/components/dev
           src/navigation/sidebar
           src/test
+          "src/app/(app)/page.tsx"
+          "src/app/(app)/settings/page.tsx"
+          "src/app/(app)/dashboard-page.test.tsx"
+          "src/app/(app)/settings-page.test.tsx"
+          src/router.tsx
+          src/router.test.tsx
+          src/app/not-found.tsx
+          "src/app/(template)/template/(main)/dashboard/_components/sidebar/app-sidebar.tsx"
 
       - name: Build bundles
         run: npm run tauri build
