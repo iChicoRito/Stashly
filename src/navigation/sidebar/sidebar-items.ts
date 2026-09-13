@@ -1,5 +1,4 @@
 import {
-  Archive,
   Banknote,
   Calendar,
   ChartBar,
@@ -7,6 +6,7 @@ import {
   Forklift,
   Gauge,
   GraduationCap,
+  HardDrive,
   HeartPulse,
   Kanban,
   LayoutDashboard,
@@ -67,7 +67,7 @@ export const sidebarItems: NavGroup[] = [
     id: 0,
     label: "Stashly",
     items: [
-      { id: "inventory", title: "Inventory", url: "/", icon: Archive },
+      { id: "dashboard", title: "Dashboard", url: "/", icon: LayoutDashboard },
       { id: "stash-settings", title: "Settings", url: "/settings", icon: Settings },
     ],
   },
@@ -147,4 +147,15 @@ export const sidebarItems: NavGroup[] = [
       },
     ],
   },
+  // The storage probe is debug-only, so its entry is appended conditionally
+  // rather than filtered at render time: a release build never contains it.
+  ...(import.meta.env.DEV
+    ? [
+        {
+          id: 2,
+          label: "Developer",
+          items: [{ id: "storage-probe", title: "Storage probe", url: "/dev/storage", icon: HardDrive }],
+        },
+      ]
+    : []),
 ];
