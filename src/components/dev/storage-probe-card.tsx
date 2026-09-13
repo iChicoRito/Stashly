@@ -85,8 +85,10 @@ function StorageProbePanel() {
     try {
       const written = await writeStorageProbe(label);
 
-      setStatus(`Wrote ${written.fileName} (${written.fileBytes} bytes), record ${written.dbRecordId}.`);
+      // Re-read first, then report: if the read back fails, the catch below owns the panel
+      // and it must not still be claiming the write succeeded.
       await load();
+      setStatus(`Wrote ${written.fileName} (${written.fileBytes} bytes), record ${written.dbRecordId}.`);
     } catch (raw) {
       // The listing is deliberately left as it was: a write that failed says nothing
       // about the records and files that are already on disk.
@@ -201,28 +203,9 @@ function StorageProbePanel() {
           <h3 className="font-semibold text-muted-foreground text-xs uppercase tracking-widest">
             Probe records / SQLite
           </h3>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">Id</TableHead>
-                  <TableHead scope="col">Label</TableHead>
-                  <TableHead scope="col">Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {listing.records.map((record) => (
-                  <TableRow key={record.id}>
-                    <TableCell className="tabular-nums">{record.id}</TableCell>
-                    <TableCell className="font-medium">{record.label}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">{record.createdAt}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <p className="text-muted-foreground text-xs">The newest 10 records are shown; every file is listed below.</p>
 
-          {listing.records.length === 0 && (
+          {listing.records.length === 0 ? (
             <Empty className="border">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -232,35 +215,37 @@ function StorageProbePanel() {
                 <EmptyDescription>Write a test record to store one in the vault database.</EmptyDescription>
               </EmptyHeader>
             </Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">Id</TableHead>
+                    <TableHead scope="col">Label</TableHead>
+                    <TableHead scope="col">Created</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {listing.records.map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="tabular-nums">{record.id}</TableCell>
+                      <TableCell className="font-medium">{record.label}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground text-xs">{record.createdAt}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </section>
 
         <section className="flex flex-col gap-2">
           <h3 className="font-semibold text-muted-foreground text-xs uppercase tracking-widest">Probe files / Files</h3>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">File</TableHead>
-                  <TableHead scope="col" className="text-right">
-                    Bytes
-                  </TableHead>
-                  <TableHead scope="col">Modified</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {listing.files.map((file) => (
-                  <TableRow key={file.name}>
-                    <TableCell className="font-mono">{file.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">{file.bytes}</TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">{file.modifiedAt}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <p className="text-muted-foreground text-xs">
+            Every file in the vault&rsquo;s files directory, newest first.
+          </p>
 
-          {listing.files.length === 0 && (
+          {listing.files.length === 0 ? (
             <Empty className="border">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
@@ -272,6 +257,29 @@ function StorageProbePanel() {
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead scope="col">File</TableHead>
+                    <TableHead scope="col" className="text-right">
+                      Bytes
+                    </TableHead>
+                    <TableHead scope="col">Modified</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {listing.files.map((file) => (
+                    <TableRow key={file.name}>
+                      <TableCell className="font-mono">{file.name}</TableCell>
+                      <TableCell className="text-right tabular-nums">{file.bytes}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground text-xs">{file.modifiedAt}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </section>
       </CardContent>

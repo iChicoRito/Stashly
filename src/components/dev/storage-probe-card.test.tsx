@@ -43,6 +43,10 @@ function writeButton() {
   return screen.getByRole("button", { name: /write test record and file/i });
 }
 
+function reloadButton() {
+  return screen.getByRole("button", { name: /reload from disk/i });
+}
+
 describe("Storage probe card", () => {
   // A block body on purpose: a concise arrow here would return the mock, and Vitest
   // treats a function returned from a hook as teardown, so it would call the mock again
@@ -116,13 +120,51 @@ describe("Storage probe card", () => {
     expect(screen.getByText(fileName)).toBeInTheDocument();
   });
 
+  test("does not claim a write succeeded when the re-read is what failed", async () => {
+    const user = userEvent.setup();
+    writeMock.mockResolvedValue(result);
+    // The mount read is fine; the read that follows the write is the one that fails.
+    readMock.mockResolvedValueOnce({ records: [], files: [] });
+    readMock.mockRejectedValueOnce(new VaultCommandError("io", "The vault's files directory could not be read."));
+    render(<StorageProbeCard />);
+
+    await user.type(labelField(), "Smoke test");
+    await user.click(writeButton());
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("Storage probe failed (io)")).toBeInTheDocument();
+    // The panel must not report a write it could not read back, or it would show the
+    // success line and the failure alert at the same time.
+    expect(screen.getByRole("status")).not.toHaveTextContent(/wrote/i);
+  });
+
   test("renders the three resolved locations and an empty state before the first probe", async () => {
     render(<StorageProbeCard />);
 
     expect(await screen.findByText(paths.vaultRoot)).toBeInTheDocument();
     expect(screen.getByText(paths.dbPath)).toBeInTheDocument();
     expect(screen.getByText(paths.filesDir)).toBeInTheDocument();
+    // The empty state stands in for the table rather than sitting under an empty header row.
     expect(screen.getByText(/no probe records yet/i)).toBeInTheDocument();
     expect(screen.getByText(/no probe files yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+  });
+
+  test("re-reads the vault when Reload from disk is clicked", async () => {
+    const user = userEvent.setup();
+    render(<StorageProbeCard />);
+
+    // Wait for the mount read to land, so the reload is the only read still in flight.
+    expect(await screen.findByText(/no probe records yet/i)).toBeInTheDocument();
+
+    // The vault changed since the card mounted: re-reading is the only way it can show a
+    // record this session never wrote.
+    readMock.mockResolvedValue(listing);
+    await user.click(reloadButton());
+
+    expect(await screen.findByText(record.label)).toBeInTheDocument();
+    expect(screen.getByText(fileName)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Re-read the vault from disk.");
+    expect(writeMock).not.toHaveBeenCalled();
   });
 });

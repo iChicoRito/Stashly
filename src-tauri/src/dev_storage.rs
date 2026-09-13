@@ -42,6 +42,12 @@ pub struct StorageProbeFile {
     pub name: String,
     pub bytes: u64,
     pub modified_at: String,
+    /// The record id the file's name carries, or `None` for a file the probe did not write.
+    ///
+    /// Ordering only, and never serialized: `#[serde(skip)]` keeps the wire shape at
+    /// §4.2's `{ name, bytes, modifiedAt }`, and a test asserts the JSON is exactly that.
+    #[serde(skip)]
+    pub record_id: Option<i64>,
 }
 
 /// The read half, shaped for `StorageProbeListing`.
@@ -183,18 +189,38 @@ fn list_probe_files(conn: &Connection, files_dir: &Path) -> VaultResult<Vec<Stor
             continue;
         }
 
+        let name = entry.file_name().to_string_lossy().into_owned();
+
         files.push(StorageProbeFile {
-            name: entry.file_name().to_string_lossy().into_owned(),
+            record_id: probe_file_id(&name),
+            name,
             bytes: metadata.len(),
             modified_at: iso8601_utc(conn, metadata.modified()?)?,
         });
     }
 
-    // Newest first, matching the records. The name breaks a tie between two files written
-    // in the same second: `probe-<stamp>-<id>.txt` sorts by id.
-    files.sort_by(|left, right| right.modified_at.cmp(&left.modified_at).then_with(|| right.name.cmp(&left.name)));
+    // Newest first, matching the records. `modified_at` carries milliseconds, but two files
+    // written in the same millisecond still need an order, and the record id in the name is
+    // it — compared as a number, because "probe-…-10.txt" sorts *before* "probe-…-9.txt" as
+    // text. A file that is not a probe file has no id and comes after the probe files it
+    // ties with, ordered by name.
+    files.sort_by(|left, right| {
+        right
+            .modified_at
+            .cmp(&left.modified_at)
+            .then_with(|| right.record_id.cmp(&left.record_id))
+            .then_with(|| right.name.cmp(&left.name))
+    });
 
     Ok(files)
+}
+
+/// The record id a probe file's name carries, or `None` when the probe did not write it.
+///
+/// `write_probe_file` writes `probe-<stamp>-<id>.txt`, so the last dash-separated segment
+/// is the id. Anything a human drops into `files/` has no id to order by.
+fn probe_file_id(name: &str) -> Option<i64> {
+    name.strip_prefix("probe-")?.strip_suffix(".txt")?.rsplit('-').next()?.parse().ok()
 }
 
 /// A modification time as the ISO-8601 UTC text the rest of the vault writes.
@@ -377,29 +403,91 @@ mod tests {
         assert!(files.is_empty());
     }
 
+    /// Sets a file's modification time outright, so an ordering test does not depend on how
+    /// fast two writes follow each other.
+    fn set_modified(path: &Path, elapsed: std::time::Duration) {
+        let file = std::fs::OpenOptions::new().write(true).open(path).expect("the file is openable");
+        file.set_times(std::fs::FileTimes::new().set_modified(UNIX_EPOCH + elapsed))
+            .expect("the modification time is set");
+    }
+
     #[test]
     fn list_probe_files_lists_files_newest_first_and_skips_directories() {
         let conn = open();
         let paths = vault_paths::resolve(&temp_dir("listing"));
 
-        write_probe_file(&paths, "first", "20260913-164512", 1).expect("written");
-        write_probe_file(&paths, "second", "20260913-164513", 2).expect("written");
-        // Only `files/` is listed, and only its regular files: the sibling `db/` holds the
-        // database, and a directory inside `files/` is not a probe file.
-        std::fs::create_dir_all(paths.db.parent().expect("the db path has a parent")).expect("db directory");
+        let older = write_probe_file(&paths, "first", "20260913-164512", 1).expect("written");
+        let newer = write_probe_file(&paths, "second", "20260913-164513", 2).expect("written");
+        set_modified(&older.path, std::time::Duration::from_secs(1_757_784_000));
+        set_modified(&newer.path, std::time::Duration::from_secs(1_757_784_001));
+        // Only `files/` is listed, and only its regular files: a directory inside `files/`
+        // is not a probe file. The database is not a case this can even meet — it lives in
+        // `db/`, a sibling of the directory being read.
         std::fs::create_dir_all(paths.files.join("nested")).expect("nested directory");
 
         let files = list_probe_files(&conn, &paths.files).expect("the listing is read");
 
-        assert_eq!(files.len(), 2, "the db directory and the nested directory are not files");
+        assert_eq!(files.len(), 2, "the nested directory is not a file");
+        // The order is the property this test is named for, so it is asserted positionally
+        // rather than by membership: an inverted comparator has to fail here.
+        assert_eq!(files[0].name, newer.name, "the newest file is listed first");
+        assert_eq!(files[1].name, older.name);
         for file in &files {
             assert!(file.bytes > 0, "{} has its byte count", file.name);
             // The same ISO-8601 shape the records carry, so both tables format alike.
             assert_eq!(file.modified_at.len(), 24, "{} carries a full timestamp", file.name);
             assert!(file.modified_at.ends_with('Z'), "{} is UTC", file.name);
         }
-        assert!(files.iter().any(|file| file.name.ends_with("-1.txt")));
-        assert!(files.iter().any(|file| file.name.ends_with("-2.txt")));
+
+        std::fs::remove_dir_all(&paths.root).expect("the temp directory is removed");
+    }
+
+    #[test]
+    fn list_probe_files_orders_two_files_from_the_same_millisecond_by_their_record_id() {
+        let conn = open();
+        let paths = vault_paths::resolve(&temp_dir("tie-break"));
+
+        // Ten files share one modification time, which is the only case the timestamp
+        // cannot order. The ids have to be compared as numbers here: "probe-…-10.txt"
+        // precedes "probe-…-9.txt" as text, so a string tie-break would list 9 first.
+        let mut written = Vec::new();
+        for id in 1..=10 {
+            let file = write_probe_file(&paths, "tied", "20260913-164512", id).expect("written");
+            set_modified(&file.path, std::time::Duration::from_secs(1_757_784_000));
+            written.push(file);
+        }
+
+        let files = list_probe_files(&conn, &paths.files).expect("the listing is read");
+
+        assert_eq!(files.len(), 10);
+        // Highest id first the whole way down. A text tie-break would list 9 before 10 and
+        // fail on the first element, which is the ordering this test exists to pin.
+        let newest_first: Vec<&str> = files.iter().map(|file| file.name.as_str()).collect();
+        let expected: Vec<&str> = written.iter().rev().map(|file| file.name.as_str()).collect();
+
+        assert_eq!(newest_first, expected);
+        assert_eq!(files[0].name, "probe-20260913-164512-10.txt");
+
+        std::fs::remove_dir_all(&paths.root).expect("the temp directory is removed");
+    }
+
+    #[test]
+    fn a_file_the_probe_did_not_write_is_listed_last_among_the_files_it_ties_with() {
+        let conn = open();
+        let paths = vault_paths::resolve(&temp_dir("foreign"));
+
+        let probe = write_probe_file(&paths, "probe", "20260913-164512", 1).expect("written");
+        let foreign = paths.files.join("notes.txt");
+        std::fs::write(&foreign, "a file a human put here\n").expect("the foreign file is written");
+        let tied = std::time::Duration::from_secs(1_757_784_000);
+        set_modified(&probe.path, tied);
+        set_modified(&foreign, tied);
+
+        let files = list_probe_files(&conn, &paths.files).expect("the listing is read");
+
+        assert_eq!(files.len(), 2, "a file the probe did not write is still listed");
+        assert_eq!(files[0].name, probe.name, "the probe file leads the tie it has no id for");
+        assert_eq!(files[1].record_id, None);
 
         std::fs::remove_dir_all(&paths.root).expect("the temp directory is removed");
     }
@@ -483,6 +571,7 @@ mod tests {
                 created_at: "2026-09-13T16:45:12.345Z".to_string(),
             }],
             files: vec![StorageProbeFile {
+                record_id: Some(2),
                 name: "probe-20260913-164512-2.txt".to_string(),
                 bytes: 88,
                 modified_at: "2026-09-13T16:45:12.345Z".to_string(),
@@ -494,6 +583,7 @@ mod tests {
         // `StorageProbeRecord` and `StorageProbeFile` verbatim from §4.2. The file's field
         // is `modifiedAt` and not `modified`: the frontend reads `modifiedAt`, so an
         // earlier draft's `modified` reached the UI as `undefined` with nothing failing.
+        // The record id the ordering uses is `#[serde(skip)]`, so it is absent here.
         assert_eq!(
             serialized,
             serde_json::json!({

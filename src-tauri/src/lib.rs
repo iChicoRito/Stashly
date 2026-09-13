@@ -5,7 +5,9 @@
 // code until the Tauri commands are wired up.
 pub mod db;
 // The probe is compiled only in debug builds: a release binary then has no probe command
-// to register, so the handler list below cannot expose one even by mistake.
+// to register, so the handler list below cannot expose one even by mistake. The cost is
+// that the probe's tests run only under the debug test profile — `cargo test --release`
+// compiles none of them.
 #[cfg(debug_assertions)]
 pub mod dev_storage;
 pub mod error;
