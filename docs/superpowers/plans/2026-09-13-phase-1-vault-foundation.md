@@ -293,6 +293,8 @@ Folds dependency install, IPC wrapper, and its test into one reviewable unit.
 
 ### Task 5 — Verify the real on-disk state against Tauri's actual path resolution
 
+**Execution order (Ruling 27): run Task 6 first, then this one.** Task 6 adds the debug panel that displays the resolved paths, so this task becomes a single app run that both confirms the locations and exercises that panel. Nothing in Task 6 depends on this task's result, because it calls `app_data_dir()` at runtime and shows whatever comes back.
+
 **Files:** `src-tauri/src/vault_paths.rs` tests.
 
 This task exists because D2 assumes `app_data_dir()` resolves to a locally-created directory. That assumption must be observed, not inferred.
@@ -303,6 +305,12 @@ This task exists because D2 assumes `app_data_dir()` resolves to a locally-creat
 - [ ] **Commit:** `test(vault): prove the resolved vault path layout`
 
 ### Task 6 — Debug-only storage probe (R-01's owner of the file half)
+
+**Execution order (Ruling 27): this task runs BEFORE Task 5.** See Task 5's note.
+
+**Two corrections from earlier tasks that this task must carry:**
+1. **`vault_paths::resolve(&root)` is a free function** — write it exactly that way. An earlier draft of Task 4's `setup()` snippet said `VaultPaths::resolve(&root)`, which cannot compile (`E0599`), because `VaultPaths` has only `ensure`. Task 4 hit it and reported it; the plan is now corrected.
+2. **Task 6 is the second writer of `invoke_handler!`** — the plan's earlier wording had Task 4 say it "will need to register all five commands", but Task 4 owns only the production pair. When this task adds its three debug commands it must reproduce `vault::vault_get_state` and `vault::vault_complete_onboarding` in **both** `#[cfg]` branches. Dropping them is a runtime failure with no compile error: the handler list is the only registration point.
 
 **Files:** `src-tauri/src/dev_storage.rs`, `src-tauri/src/lib.rs`, `src/components/dev/storage-probe-card.tsx`, `src/app/(app)/dev/storage/page.tsx`, `src/lib/vault/api.ts` (three probe calls), `src/router.tsx`.
 
