@@ -28,9 +28,11 @@ const VALUE_FALSE: &str = "0";
 /// Phase 1 stores everything on this device, so this is the only mode written.
 const STORAGE_MODE_LOCAL: &str = "local";
 
-/// The longest user name the vault accepts. Task 4 rejects the same name earlier with
-/// the same message, but `save_onboarding` must not be able to write a partial vault.
-const MAX_USER_NAME_LEN: usize = 120;
+/// The longest user name the vault accepts, shared rather than re-invented: Task 4's
+/// `validate_submission` and Task 7's wizard state both need the same number, and a name
+/// that passes the wizard must not then fail at submit. `save_onboarding` re-checks it
+/// before its transaction opens, because a rejected submission must not write anything.
+pub const MAX_USER_NAME_LEN: usize = 120;
 
 /// Task 6's probe reuses `app_settings`, so it needs no schema of its own.
 const PROBE_LABEL_SUFFIX: &str = ".label";
@@ -280,7 +282,13 @@ fn free_slug(base: &str, taken: &HashSet<String>) -> String {
     }
 }
 
-/// The URL-safe form of a collection name.
+/// The slug form of a collection name: lowercase alphanumerics, every other run
+/// collapsed to one `-`, and no leading or trailing dash.
+///
+/// Deliberately not ASCII-folded: `slugify("Café")` is `café`, not `cafe`. Folding would
+/// turn a name into another name's slug, and the `UNIQUE` constraint would then force the
+/// user's collection to a `-2` suffix. Phase 1's starter collections are ASCII, so
+/// nothing reachable today produces a non-ASCII slug.
 pub fn slugify(name: &str) -> String {
     let mut slug = String::new();
     let mut pending_dash = false;
@@ -460,11 +468,18 @@ mod tests {
         set_setting(&conn, "vault_name", "Stash").expect("the first write succeeds");
         assert_eq!(get_setting(&conn, "vault_name").expect("the lookup succeeds").as_deref(), Some("Stash"));
 
+        let first_write = updated_at(&conn, "vault_name");
+        assert_eq!(first_write.len(), 24, "timestamps are ISO-8601 UTC with milliseconds");
+
+        // Long enough that a kept timestamp would be visibly different. This is the row
+        // `vault_state` reads `onboarding_completed_at` from, so a stale `updated_at`
+        // would put a wrong completion time in the UI without any other test failing.
+        std::thread::sleep(Duration::from_millis(20));
         set_setting(&conn, "vault_name", "Vault").expect("the upsert succeeds");
 
         assert_eq!(get_setting(&conn, "vault_name").expect("the lookup succeeds").as_deref(), Some("Vault"));
         assert_eq!(count(&conn, "app_settings"), 1, "an upsert replaces the row instead of adding one");
-        assert_eq!(updated_at(&conn, "vault_name").len(), 24, "timestamps are ISO-8601 UTC with milliseconds");
+        assert_ne!(updated_at(&conn, "vault_name"), first_write, "an upsert refreshes the timestamp as well as the value");
     }
 
     #[test]
@@ -527,6 +542,32 @@ mod tests {
     }
 
     #[test]
+    fn create_collections_skips_a_blank_name() {
+        let conn = open();
+        let requested = vec!["Work".to_string(), String::new(), "   ".to_string()];
+
+        let collections = create_collections(&conn, &requested, true).expect("the named collection is created");
+
+        assert_eq!(count(&conn, "collections"), 1, "a blank name is not a collection");
+        assert_eq!(names(&collections), vec!["Work"]);
+    }
+
+    #[test]
+    fn create_collections_gives_a_name_with_no_slug_a_readable_one() {
+        let conn = open();
+        let requested = vec!["***".to_string(), "!!".to_string()];
+
+        let collections = create_collections(&conn, &requested, true).expect("both collections are created");
+
+        let mut slugs: Vec<&str> = collections.iter().map(|collection| collection.slug.as_str()).collect();
+        slugs.sort_unstable();
+
+        assert_eq!(count(&conn, "collections"), 2, "a name the user chose is never dropped");
+        assert_eq!(slugs, vec!["collection", "collection-2"]);
+        assert_eq!(names(&collections), vec!["!!", "***"], "the list is by name, not insertion order");
+    }
+
+    #[test]
     fn save_onboarding_writes_the_settings_the_collections_and_the_flag_in_one_transaction() {
         let mut conn = open();
         let submission = submission("Ada Lovelace");
@@ -566,6 +607,10 @@ mod tests {
         assert_eq!(state.vault_name, "Ada's Vault", "a given vault name wins over the derived one");
         assert!(hash.starts_with("$argon2id$"), "the stored value is an argon2id PHC string, not the password");
         assert!(hash.contains(&salt), "the stored salt is the one inside the PHC string");
+        assert!(
+            !hash.contains("correct horse battery") && !salt.contains("correct horse battery"),
+            "the plaintext password is in neither stored value"
+        );
         assert!(verify_master_password("correct horse battery", &hash).expect("the check runs"));
         assert!(!verify_master_password("correct horse batteru", &hash).expect("the check runs"));
     }
@@ -606,6 +651,35 @@ mod tests {
         let state = save_onboarding(&mut conn, &submission).expect("a 120 character name is accepted");
 
         assert_eq!(state.user_name.chars().count(), MAX_USER_NAME_LEN);
+    }
+
+    #[test]
+    fn save_onboarding_rejects_a_blank_user_name_before_writing_anything() {
+        for blank in ["", "   "] {
+            let mut conn = open();
+
+            let error = save_onboarding(&mut conn, &submission(blank)).expect_err("a blank name is rejected");
+
+            assert_eq!(error.code(), "validation");
+            assert_eq!(count(&conn, "app_settings"), 0, "a blank name writes no settings");
+            assert_eq!(count(&conn, "collections"), 0, "and no collections");
+            assert!(vault_state(&conn).expect("the state is readable").is_none());
+        }
+    }
+
+    #[test]
+    fn save_onboarding_treats_an_empty_password_as_no_protection() {
+        let mut conn = open();
+        let mut submission = submission("Ada");
+        submission.master_password = Some(String::new());
+
+        let state = save_onboarding(&mut conn, &submission).expect("the vault is created");
+
+        assert!(!state.protection_enabled);
+        assert_eq!(get_setting(&conn, KEY_PROTECTION_ENABLED).expect("read").as_deref(), Some(VALUE_FALSE));
+        assert_eq!(get_setting(&conn, KEY_PASSWORD_HASH).expect("read"), None, "no hash row is written");
+        assert_eq!(get_setting(&conn, KEY_PASSWORD_SALT).expect("read"), None, "and no salt row either");
+        assert_eq!(count(&conn, "app_settings"), 5, "an empty password adds no rows");
     }
 
     #[test]
@@ -688,6 +762,7 @@ mod tests {
         assert_eq!(slugify("Finance / Taxes (2026)"), "finance-taxes-2026");
         assert_eq!(slugify("a--b__c"), "a-b-c");
         assert_eq!(slugify("***"), "", "a name with no alphanumerics has no slug");
+        assert_eq!(slugify("Café"), "café", "non-ASCII letters are kept rather than folded away");
     }
 
     #[test]
