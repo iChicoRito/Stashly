@@ -9,7 +9,14 @@ import {
   VaultCommandError,
   writeStorageProbe,
 } from "@/lib/vault/api";
-import type { OnboardingSubmission } from "@/lib/vault/types";
+import type {
+  OnboardingSubmission,
+  StorageProbeListing,
+  StorageProbePaths,
+  StorageProbeResult,
+  VaultCollection,
+  VaultStartup,
+} from "@/lib/vault/types";
 
 vi.mock("@tauri-apps/api/core", async () => await import("@/test/mocks/tauri-core"));
 
@@ -31,29 +38,29 @@ describe("vault api", () => {
   });
 
   test("returns the not_initialized startup state unchanged", async () => {
-    invokeMock.mockResolvedValue({ status: "not_initialized" });
+    const notInitialized: VaultStartup = { status: "not_initialized" };
+    invokeMock.mockResolvedValue(notInitialized);
 
-    await expect(getVaultStartup()).resolves.toEqual({ status: "not_initialized" });
+    await expect(getVaultStartup()).resolves.toEqual(notInitialized);
     expect(invokeMock).toHaveBeenCalledWith("vault_get_state");
   });
 
   test("returns the ready state unchanged and passes the submission as camelCase", async () => {
-    const ready = {
+    const starterCollection: VaultCollection = {
+      id: 1,
+      slug: "projects",
+      name: "Projects",
+      createdAt: "2026-09-13T00:00:00.000Z",
+      isStarter: true,
+    };
+    const ready: VaultStartup = {
       status: "ready",
       user_name: "Mark Adrianne",
       vault_name: "Mark Adrianne's Stash",
       storage_mode: "local",
       protection_enabled: false,
       onboarding_completed_at: "2026-09-13T00:00:00.000Z",
-      collections: [
-        {
-          id: 1,
-          slug: "projects",
-          name: "Projects",
-          createdAt: "2026-09-13T00:00:00.000Z",
-          isStarter: true,
-        },
-      ],
+      collections: [starterCollection],
     };
     invokeMock.mockResolvedValue(ready);
 
@@ -82,7 +89,7 @@ describe("vault api", () => {
   });
 
   test("writes a storage probe with the typed label and returns the result unchanged", async () => {
-    const result = {
+    const result: StorageProbeResult = {
       dbRecordId: 1,
       dbRecordLabel: "Smoke test",
       dbRecordCreatedAt: "2026-09-13T00:00:00.000Z",
@@ -99,7 +106,7 @@ describe("vault api", () => {
   });
 
   test("reads storage probes with a null limit so Rust applies its default", async () => {
-    const listing = {
+    const listing: StorageProbeListing = {
       records: [{ id: 1, label: "Smoke test", createdAt: "2026-09-13T00:00:00.000Z" }],
       files: [{ name: "probe-20260913-120000-1.txt", bytes: 42, modifiedAt: "2026-09-13T00:00:00.000Z" }],
     };
@@ -110,7 +117,7 @@ describe("vault api", () => {
   });
 
   test("reads storage probes with the caller's limit", async () => {
-    const listing = { records: [], files: [] };
+    const listing: StorageProbeListing = { records: [], files: [] };
     invokeMock.mockResolvedValue(listing);
 
     await expect(readStorageProbe(25)).resolves.toEqual(listing);
@@ -118,7 +125,11 @@ describe("vault api", () => {
   });
 
   test("reads the storage probe paths and returns them unchanged", async () => {
-    const paths = { vaultRoot: "/vault", dbPath: "/vault/db/stashly.db", filesDir: "/vault/files" };
+    const paths: StorageProbePaths = {
+      vaultRoot: "/vault",
+      dbPath: "/vault/db/stashly.db",
+      filesDir: "/vault/files",
+    };
     invokeMock.mockResolvedValue(paths);
 
     await expect(getStorageProbePaths()).resolves.toEqual(paths);
@@ -132,6 +143,13 @@ describe("vault api", () => {
       name: "VaultCommandError",
       code: "io",
     });
+  });
+
+  test("maps a rejected probe read to VaultCommandError with its code", async () => {
+    invokeMock.mockRejectedValue({ code: "io", message: "probe listing failed" });
+
+    await expect(readStorageProbe(5)).rejects.toBeInstanceOf(VaultCommandError);
+    await expect(readStorageProbe(5)).rejects.toMatchObject({ name: "VaultCommandError", code: "io" });
   });
 
   test("turns an Error rejection into an internal VaultCommandError", async () => {
