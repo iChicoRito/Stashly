@@ -39,7 +39,7 @@ Everything below was read, not assumed.
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | **Custom Rust commands over `rusqlite` (bundled)** — no `tauri-plugin-sql` | Phase 5 (backup, relocation, encryption) and Q-10's coordinated record+file writes need one Rust-side seam; keeps raw SQL and absolute paths out of the webview. |
-| D2 | **Vault root = Tauri `app_data_dir()`** (`%APPDATA%\com.stashly.app` on Windows, `~/Library/Application Support/com.stashly.app` on macOS) | T-01 hides storage paths and says "default local application storage"; `C:\Users\marka\AppData\Local\com.stashly.app` already exists on this machine, so Tauri's real resolution must be *verified*, not assumed (see Task 5). Phase 5 relocation moves this one directory. |
+| D2 | **Vault root = Tauri `app_data_dir()`** (`%APPDATA%\com.stashly.desktop` on Windows, `~/Library/Application Support/com.stashly.desktop` on macOS) | T-01 hides storage paths and says "default local application storage"; the real Windows resolution was observed in Task 5 at `C:\Users\marka\AppData\Roaming\com.stashly.desktop`, so Task 12 records that path rather than assuming a Local-data location. Phase 5 relocation moves this one directory. |
 | D3 | **Delete the `stash` prototype**; real Dashboard at `/` | Demo rows would contradict a fresh vault, and Phase 2's item model (R-03/R-04) replaces it. |
 | D4 | **Hash the optional master password with Argon2id now; no locking** | R-02's password step and completion screen become real; the hash + salt columns are exactly what R-17 needs. |
 | D5 | E2E and macOS evidence limits are **documented, not faked** | macOS cannot be built on this host. This is a stated Phase 1 constraint, resolved in Task 12. |
@@ -300,7 +300,7 @@ Folds dependency install, IPC wrapper, and its test into one reviewable unit.
 This task exists because D2 assumes `app_data_dir()` resolves to a locally-created directory. That assumption must be observed, not inferred.
 
 - [ ] Add `vault_paths.rs` unit tests using `std::env::temp_dir()` proving `resolve()` yields `root/db/stashly.db` and `root/files`, and `ensure()` creates all three.
-- [ ] Launch the built app and observe the **actual** on-disk result directly — this task deliberately does not depend on Task 6's debug panel. Run `npm run tauri dev`, then from a separate shell list `<APPDATA>\com.stashly.app`, `<LOCALAPPDATA>\com.stashly.app`, and `<LOCALAPPDATA>\com.stashly.app\db`, and record which one holds `stashly.db`. (Recon found `C:\Users\marka\AppData\Local\com.stashly.app` already present; Tauri 2's `app_data_dir` resolves through `dirs::data_dir`, so it may be the Roaming `%APPDATA%` variant instead. Whichever it is, the confirmed value goes into Task 12's docs and into a `Ruling:` ledger line.)
+- [ ] Launch the built app and observe the **actual** on-disk result directly — this task deliberately does not depend on Task 6's debug panel. Inspect both `%APPDATA%\com.stashly.desktop` and `%LOCALAPPDATA%\com.stashly.desktop`, then record which one contains `db\stashly.db` and `files\`. Task 5 confirmed the real root as `C:\Users\marka\AppData\Roaming\com.stashly.desktop`; the Local directory contains only the WebView2 `EBWebView` profile. The confirmed value goes into Task 12's docs and into a `Ruling:` ledger line.
 - [ ] Re-run the app and confirm the same DB row survives, proving the path is stable across launches.
 - [ ] **Commit:** `test(vault): prove the resolved vault path layout`
 
@@ -451,7 +451,7 @@ This task exists because D2 assumes `app_data_dir()` resolves to a locally-creat
 1. `@tauri-apps/api` on `core:default` alone can invoke custom commands (true for Tauri 2; the capability does not need a per-command permission).
 2. Inline `#[cfg(test)]` Rust unit tests plus the manual E2E walkthrough are sufficient Phase 1 verification; no headless Tauri driver (`tauri-driver`/WebDriver) is introduced, since it would need a separate Rust component and a matching driver on this host.
 3. `rusqlite` 0.40 with `bundled` builds and links on this Windows MSVC host (the SQLite C compile is a normal, expected build cost).
-4. `app_data_dir()` resolves under `%APPDATA%` or `%LOCALAPPDATA%\com.stashly.app` on Windows — **verified in Task 5, not assumed**.
+4. `app_data_dir()` resolves under `%APPDATA%\com.stashly.desktop` on Windows — **verified in Task 5, not assumed**; `%LOCALAPPDATA%\com.stashly.desktop` is WebView2 profile data only.
 
 ## 9. Subagent execution
 
