@@ -26,7 +26,10 @@ const MAX_MASTER_PASSWORD_LEN: usize = 1024;
 
 /// What a command hands back when the lock guarding the connection is poisoned, which
 /// only happens after another command panicked while holding it.
-const LOCK_POISONED: &str = "vault state lock poisoned";
+///
+/// `pub(crate)` because the debug probe's commands take the same lock and must report the
+/// same failure: a second copy of this message would let the two drift apart.
+pub(crate) const LOCK_POISONED: &str = "vault state lock poisoned";
 
 /// The vault as the frontend's `VaultStartup` union reads it.
 ///
