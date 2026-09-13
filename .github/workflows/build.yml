@@ -86,16 +86,19 @@ jobs:
       # So the step names Phase 1's directories PLUS the Phase 1 files that cannot be
       # included as whole directories: `src/app/(app)`, `src/router.tsx` and
       # `src/app/not-found.tsx` were created or rewritten by this phase while their
-      # siblings in `src/app/(template)/**` were not, and the one template file this
-      # phase did change (a brand-link fix in app-sidebar.tsx) is therefore named on its
-      # own. Without these explicit paths CI could pass while this phase's own pages,
-      # routing and navigation regressed.
+      # siblings in `src/app/(template)/**` were not, and the two template files this
+      # phase did change (a brand-link fix in app-sidebar.tsx, and the search shortcut
+      # hint in search-dialog.tsx) are therefore named on their own. Without these
+      # explicit paths CI could pass while this phase's own pages, routing and
+      # navigation regressed.
       #
       # The parenthesised paths are quoted because the default shell on the GitHub
       # Windows runner is PowerShell, where bare parentheses are metacharacters.
       #
       # Widen the list as later phases adopt the files they touch; replacing it with a
-      # repo-wide run turns CI red on debt this phase did not create.
+      # repo-wide run turns CI red on debt this phase did not create. Every path named here
+      # must exist: Biome exits 1 with "No files were processed" for one that does not, so a
+      # deleted page or directory has to leave this list in the same change.
       - name: Lint (Phase 1 scope)
         run: >-
           npx biome check
@@ -103,17 +106,14 @@ jobs:
           src/stores/onboarding
           src/stores/vault
           src/components/onboarding
-          src/components/dev
           src/navigation/sidebar
           src/test
           "src/app/(app)/page.tsx"
-          "src/app/(app)/settings/page.tsx"
-          "src/app/(app)/dashboard-page.test.tsx"
-          "src/app/(app)/settings-page.test.tsx"
           src/router.tsx
           src/router.test.tsx
           src/app/not-found.tsx
           "src/app/(template)/template/(main)/dashboard/_components/sidebar/app-sidebar.tsx"
+          "src/app/(template)/template/(main)/dashboard/_components/sidebar/search-dialog.tsx"
 
       - name: Build bundles
         run: npm run tauri build

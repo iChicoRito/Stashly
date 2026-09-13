@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 
@@ -68,6 +68,13 @@ function getAvailableItems(items: SearchItem[]) {
 
 const recommendations = getAvailableItems(searchItems);
 
+/**
+ * The shortcut the listener below accepts, written the way this platform writes it: ⌘ means
+ * nothing on Windows, where this app ships first, and "Ctrl J" means nothing on a Mac. The
+ * listener takes either modifier, so only the hint beside the label has to choose.
+ */
+const SEARCH_SHORTCUT = /mac/i.test(navigator.platform) ? "⌘J" : "Ctrl J";
+
 function groupBy(items: SearchItem[]) {
   const groups = [...new Set(items.map((item) => item.group))];
   return groups.map((group) => ({
@@ -103,7 +110,8 @@ export function SearchDialog() {
     if (item.newTab) {
       window.open(item.url, "_blank", "noopener,noreferrer");
     } else {
-      navigate(item.url);
+      // `navigate` resolves once the navigation is done; nothing here waits for that.
+      void navigate(item.url);
     }
   };
 
@@ -138,13 +146,13 @@ export function SearchDialog() {
       >
         <Search data-icon="inline-start" />
         Search
-        <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
-          <span className="text-xs">âŒ˜</span>J
+        <kbd className="inline-flex h-5 select-none items-center rounded border bg-muted px-1.5 font-medium text-[10px]">
+          {SEARCH_SHORTCUT}
         </kbd>
       </Button>
       <CommandDialog open={open} onOpenChange={handleOpenChange}>
         <Command>
-          <CommandInput placeholder="Search dashboards, users, and moreâ€¦" value={query} onValueChange={setQuery} />
+          <CommandInput placeholder="Search dashboards, users, and more…" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             {query ? renderGroups(searchItems) : renderGroups(recommendations)}
