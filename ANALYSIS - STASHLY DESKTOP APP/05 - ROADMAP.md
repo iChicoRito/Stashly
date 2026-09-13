@@ -4,7 +4,7 @@
 
 ## What this covers
 
-Capability order for the intended desktop vault. It covers building work only. No source proof was supplied, so nothing is marked finished, in progress, or already there.
+Capability order for the intended desktop vault. It covers building work only. This roadmap was first written from supplied material alone, with nothing marked finished, in progress, or already there; Phase 1 has since been built on the `phase-1-vault-foundation` branch, so R-01 and R-02 now carry 🟨 with the evidence and the remaining limits recorded in “Phase 1 implementation record” below. No other status changed.
 
 ## Where the plan came from
 
@@ -15,15 +15,15 @@ This roadmap is *drawn from* [02 - FINDINGS](02%20-%20FINDINGS.md), `MATERIAL/T-
 | Status | How many |
 |---|---:|
 | ✅ Finished | 0 |
-| 🟨 Being worked on | 0 |
-| ⭕ Not started | 12 |
+| 🟨 Being worked on | 2 |
+| ⭕ Not started | 10 |
 | ❌ Blocked | 13 |
 | 🔵 Already there | 0 |
 | ⬜ Dropped | 0 |
 | ❓ Unclear | 0 |
 | **Total** | **25** |
 
-Twelve capabilities are unstarted. Thirteen have a named unanswered question blocking their definition or safe completion.
+Two capabilities (R-01 and R-02) are built on the `phase-1-vault-foundation` branch and are waiting on the cross-platform CI run before they can be called finished. Ten are unstarted. Thirteen have a named unanswered question blocking their definition or safe completion.
 
 ## Phase 1 — Cross-platform local foundation and first-run vault setup
 
@@ -33,10 +33,41 @@ Twelve capabilities are unstarted. Thirteen have a named unanswered question blo
 
 | # | Capability | Depends on | Source | Status | Done when |
 |---|---|---|---|---|---|
-| R-01 | Cross-platform local desktop foundation | — | `MATERIAL/T-00.md`, “Description,” lines 9–11; “Constraints,” lines 25–30 | ⭕ | On both Windows and macOS, an installed Stashly app opens a React and TypeScript screen prepared with Vite and using a visible Shadcn UI control; that screen asks Tauri to save one test record in SQLite and one test file in the local Stashly folder, then reopens and displays both after restart. |
-| R-02 | First-run vault setup and launch decision | R-01 | `MATERIAL/T-01.md`, “Onboarding Data to Save” and “Onboarding State,” lines 395–438 | ⭕ | On a fresh vault, required name blocks progress when empty; vault name, starter collections, and password can be skipped; completion opens the Dashboard; closing and reopening goes straight to the Dashboard. |
+| R-01 | Cross-platform local desktop foundation | — | `MATERIAL/T-00.md`, “Description,” lines 9–11; “Constraints,” lines 25–30 | 🟨 Built — awaiting macOS CI | On both Windows and macOS, an installed Stashly app opens a React and TypeScript screen prepared with Vite and using a visible Shadcn UI control; that screen asks Tauri to save one test record in SQLite and one test file in the local Stashly folder, then reopens and displays both after restart. |
+| R-02 | First-run vault setup and launch decision | R-01 | `MATERIAL/T-01.md`, “Onboarding Data to Save” and “Onboarding State,” lines 395–438 | 🟨 Built — awaiting macOS CI | On a fresh vault, required name blocks progress when empty; vault name, starter collections, and password can be skipped; completion opens the Dashboard; closing and reopening goes straight to the Dashboard. |
 
 **Blockers:** None stated for capability definition.
+
+## Phase 1 implementation record
+
+**Status: 🟨 built, not yet finished.** Both capabilities are implemented and unit-verified on Windows at commit `b14b9ce` on the `phase-1-vault-foundation` branch. Neither is ✅, because the native walkthroughs were not executed and the macOS bundle has never been produced — see the limits below.
+
+**Verification summary:** [../docs/verification/phase-1/00-summary.md](../docs/verification/phase-1/00-summary.md) — the implementation inventory, the captured gate evidence with its precision caveats, the two walkthrough tables (marked NOT EXECUTED), the four screenshots (NOT PRODUCED), and the durable table of all 41 execution rulings plus every deferred minor.
+
+**Where the vault lives now.** Tauri's `app_data_dir()` resolves to the **Roaming** `%APPDATA%` variant, so the final vault root is:
+
+```
+%APPDATA%\com.stashly.desktop            →  C:\Users\marka\AppData\Roaming\com.stashly.desktop
+  db\stashly.db                          →  SQLite (STRICT tables, user_version = 1) + -wal/-shm
+  files\                                 →  vault documents and attachments (separate from records)
+```
+
+`%LOCALAPPDATA%\com.stashly.desktop\EBWebView` exists too, but it is the WebView2 profile and holds no vault data. The earlier identifier `com.stashly.app` is **superseded**: the rename to `com.stashly.desktop` moved the vault root, the old `%LOCALAPPDATA%\com.stashly.app` directory contains only a WebView2 profile, and **no continuity with any pre-rename directory is claimed**.
+
+**Windows evidence:** typecheck clean, 150/150 frontend tests, the scoped Biome run green over 38 files (the repo-wide run stays red on pre-existing `src/app/(template)/**` debt this phase does not own), 64/64 Rust tests, `cargo clippy --all-targets -- -D warnings` clean, and `npm run tauri build`'s frontend preflight (`tsc --noEmit` + `vite build`) succeeding. **Not evidenced:** the installer — the captured `tauri build` log stops mid-compile with no final line.
+
+**Remaining limits, stated plainly:**
+
+| Limit | Detail |
+|---|---|
+| GUI walkthroughs | No native window was driven. R-01's probe-and-restart walkthrough and R-02's seven-step first-run walkthrough are **NOT EXECUTED**, so neither capability's manual gate has passed. |
+| Screenshots | All four planned images are **NOT PRODUCED**; no placeholders were committed. |
+| `tauri build` | The run did not complete, so no Windows installer is evidenced for `b14b9ce`. |
+| macOS | Never built or run: Windows host, only `x86_64-pc-windows-msvc` installed, no macOS toolchain. `.github/workflows/build.yml` (matrix `windows-latest` + `macos-latest`) is the declared mechanism and **has never been executed** — no CI result exists for either platform. |
+| Release-artifact check | The Rust release binary was byte-scanned and contains none of the three probe commands, but the matching scan of the built frontend output for the DEV-only probe nav entry and route was not performed (Ruling 37). |
+| Known limitations | A crash between the record write and the file write cannot be made atomic across the two stores (Q-10, **deferred to Phase 2**); the JS/Rust `trim()` divergence on U+0085 is parked (Ruling 31); `toggleCollection` leaves a stale error (Ruling 35); the `migrate` guard for a vault newer than `SCHEMA_VERSION` is a **Phase 2 obligation** the v2 author must add *before* the loop (Ruling 9). |
+
+These are also carried as explicit deferrals in the plan's §8 edge-case table. The macOS matrix arm is the one remaining path to ✅ for R-01 and R-02's two-platform wording.
 
 ## Phase 2 — Core content and organization
 
@@ -125,7 +156,9 @@ Twelve capabilities are unstarted. Thirteen have a named unanswered question blo
 
 ## Implementation handoff
 
-Select the earliest ⭕ item whose dependencies and blockers are clear. Read its supporting findings in [02 - FINDINGS](02%20-%20FINDINGS.md), proposed arrangement in [03 - SYSTEM ARCHITECTURE](03%20-%20SYSTEM%20ARCHITECTURE.md), relevant picture in [04 - DIAGRAMS](04%20-%20DIAGRAMS.md), and open questions in [00 - START HERE](00%20-%20START%20HERE.md).
+**Phase 1 is built but not closed.** The next actions on R-01/R-02 are the ones listed in “Phase 1 implementation record”: drive the native R-01/R-02 walkthroughs and capture the four screenshots, complete a Windows `tauri build`, and let the `windows-latest` + `macos-latest` CI matrix run — that matrix is the only macOS evidence path, and it has not been executed. Do not mark either capability ✅ before the macOS arm reports, and do not treat the green scoped unit gates as a substitute for the manual walkthroughs.
+
+For everything after that, select the earliest ⭕ item whose dependencies and blockers are clear. Read its supporting findings in [02 - FINDINGS](02%20-%20FINDINGS.md), proposed arrangement in [03 - SYSTEM ARCHITECTURE](03%20-%20SYSTEM%20ARCHITECTURE.md), relevant picture in [04 - DIAGRAMS](04%20-%20DIAGRAMS.md), and open questions in [00 - START HERE](00%20-%20START%20HERE.md). Phase 2's R-03, R-04, R-05 and R-09 are ❌ on unresolved questions Q-01, Q-03, Q-10 and Q-14, so they are not startable yet.
 
 This roadmap says what to build and in what order. Separate implementation planning must decide how, define detailed checks, and hand work to coding agents.
 
