@@ -2,9 +2,8 @@
 
 import * as React from "react";
 
-import { useNavigate } from "react-router";
-
 import { Search } from "lucide-react";
+import { useNavigate } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import {

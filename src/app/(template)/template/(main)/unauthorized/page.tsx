@@ -1,6 +1,5 @@
-import { Link } from "react-router";
-
 import { Lock } from "lucide-react";
+import { Link } from "react-router";
 
 export default function page() {
   return (

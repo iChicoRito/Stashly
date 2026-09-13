@@ -2,10 +2,8 @@
 
 import { Suspense } from "react";
 
-import { Link } from "react-router";
-import { useSearchParams } from "react-router";
-
 import { FolderPlus, Grid2X2, List, Upload } from "lucide-react";
+import { Link, useSearchParams } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";

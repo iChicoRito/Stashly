@@ -42,7 +42,8 @@ export function applyBootPreferences() {
     const root = document.documentElement;
 
     const rawMode = readPreference("theme_mode") ?? PREFERENCE_DEFAULTS.theme_mode;
-    const mode = rawMode === "dark" || rawMode === "light" || rawMode === "system" ? rawMode : PREFERENCE_DEFAULTS.theme_mode;
+    const mode =
+      rawMode === "dark" || rawMode === "light" || rawMode === "system" ? rawMode : PREFERENCE_DEFAULTS.theme_mode;
     const resolvedMode =
       mode === "system" && window.matchMedia
         ? window.matchMedia("(prefers-color-scheme: dark)").matches

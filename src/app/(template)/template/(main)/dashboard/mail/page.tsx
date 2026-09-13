@@ -1,6 +1,5 @@
-﻿import { Link } from "react-router";
-
-import { ExternalLink } from "lucide-react";
+﻿import { ExternalLink } from "lucide-react";
+import { Link } from "react-router";
 
 import { Button } from "@/components/ui/button";
 

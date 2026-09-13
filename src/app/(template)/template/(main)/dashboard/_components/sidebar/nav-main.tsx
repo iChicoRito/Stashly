@@ -1,9 +1,7 @@
 "use client";
 
-import { Link } from "react-router";
-import { useLocation } from "react-router";
-
 import { ChevronRight, MailIcon, PlusCircleIcon } from "lucide-react";
+import { Link, useLocation } from "react-router";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -175,11 +173,7 @@ function NavLinkItem({ item, isActive, showIconFallback }: NavLinkItemProps) {
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild aria-disabled={item.disabled} tooltip={item.title} isActive={isActive}>
-        <Link
-          to={item.url}
-          target={item.newTab ? "_blank" : undefined}
-          rel={item.newTab ? "noreferrer" : undefined}
-        >
+        <Link to={item.url} target={item.newTab ? "_blank" : undefined} rel={item.newTab ? "noreferrer" : undefined}>
           {Icon ? <Icon /> : showIconFallback ? <CollapsedIconFallback title={item.title} /> : null}
           <span>{item.title}</span>
         </Link>

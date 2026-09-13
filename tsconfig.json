@@ -19,9 +19,5 @@
     }
   },
   "include": ["src", "vite.config.ts", "vitest.config.ts"],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/proxy.disabled.ts"
-  ]
+  "exclude": ["node_modules", "dist", "src/proxy.disabled.ts"]
 }

@@ -1,23 +1,19 @@
 import { createHashRouter, Outlet } from "react-router";
 
-import RootLayout from "@/app/layout";
 import StashlyInventory from "@/app/(app)/page";
 import StashlySettings from "@/app/(app)/settings/page";
-import NotFound from "@/app/not-found";
-import { DashboardShell } from "@/components/layout/dashboard-shell";
-
 import TemplateExternal from "@/app/(template)/template/(external)/page";
-import ChatLayout from "@/app/(template)/template/(main)/chat/layout";
-import TemplateChat from "@/app/(template)/template/(main)/chat/page";
-import MailLayout from "@/app/(template)/template/(main)/mail/layout";
-import TemplateMail from "@/app/(template)/template/(main)/mail/page";
-import TemplateUnauthorized from "@/app/(template)/template/(main)/unauthorized/page";
-import AuthV2Layout from "@/app/(template)/template/(main)/auth/v2/layout";
 import AuthV1Login from "@/app/(template)/template/(main)/auth/v1/login/page";
 import AuthV1Register from "@/app/(template)/template/(main)/auth/v1/register/page";
+import AuthV2Layout from "@/app/(template)/template/(main)/auth/v2/layout";
 import AuthV2Login from "@/app/(template)/template/(main)/auth/v2/login/page";
 import AuthV2Register from "@/app/(template)/template/(main)/auth/v2/register/page";
-
+import ChatLayout from "@/app/(template)/template/(main)/chat/layout";
+import TemplateChat from "@/app/(template)/template/(main)/chat/page";
+import LegacyAnalyticsV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/analytics-v1/page";
+import LegacyCrmV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/crm-v1/page";
+import LegacyDefaultV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/default-v1/page";
+import LegacyFinanceV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/finance-v1/page";
 import DashboardAcademy from "@/app/(template)/template/(main)/dashboard/academy/page";
 import DashboardAnalytics from "@/app/(template)/template/(main)/dashboard/analytics/page";
 import DashboardCalendar from "@/app/(template)/template/(main)/dashboard/calendar/page";
@@ -28,22 +24,23 @@ import DashboardDefault from "@/app/(template)/template/(main)/dashboard/default
 import DashboardEcommerce from "@/app/(template)/template/(main)/dashboard/ecommerce/page";
 import DashboardFileManager from "@/app/(template)/template/(main)/dashboard/file-manager/page";
 import DashboardFinance from "@/app/(template)/template/(main)/dashboard/finance/page";
-import DashboardIndex from "@/app/(template)/template/(main)/dashboard/page";
 import DashboardInfrastructure from "@/app/(template)/template/(main)/dashboard/infrastructure/page";
 import DashboardInvoice from "@/app/(template)/template/(main)/dashboard/invoice/page";
 import DashboardKanban from "@/app/(template)/template/(main)/dashboard/kanban/page";
 import DashboardLogistics from "@/app/(template)/template/(main)/dashboard/logistics/page";
 import DashboardMail from "@/app/(template)/template/(main)/dashboard/mail/page";
+import DashboardIndex from "@/app/(template)/template/(main)/dashboard/page";
 import DashboardPatientMonitoring from "@/app/(template)/template/(main)/dashboard/patient-monitoring/page";
 import DashboardProductivity from "@/app/(template)/template/(main)/dashboard/productivity/page";
 import DashboardProfile from "@/app/(template)/template/(main)/dashboard/profile/page";
 import DashboardRoles from "@/app/(template)/template/(main)/dashboard/roles/page";
 import DashboardUsers from "@/app/(template)/template/(main)/dashboard/users/page";
-
-import LegacyAnalyticsV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/analytics-v1/page";
-import LegacyCrmV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/crm-v1/page";
-import LegacyDefaultV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/default-v1/page";
-import LegacyFinanceV1 from "@/app/(template)/template/(main)/dashboard/(legacy)/finance-v1/page";
+import MailLayout from "@/app/(template)/template/(main)/mail/layout";
+import TemplateMail from "@/app/(template)/template/(main)/mail/page";
+import TemplateUnauthorized from "@/app/(template)/template/(main)/unauthorized/page";
+import RootLayout from "@/app/layout";
+import NotFound from "@/app/not-found";
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 
 /**
  * Application routes.
@@ -100,23 +97,29 @@ export const router = createHashRouter([
       { path: "template", element: <TemplateExternal /> },
       { path: "template/unauthorized", element: <TemplateUnauthorized /> },
       {
-        element: <ChatLayout>
-          <Outlet />
-        </ChatLayout>,
+        element: (
+          <ChatLayout>
+            <Outlet />
+          </ChatLayout>
+        ),
         children: [{ path: "template/chat", element: <TemplateChat /> }],
       },
       {
-        element: <MailLayout>
-          <Outlet />
-        </MailLayout>,
+        element: (
+          <MailLayout>
+            <Outlet />
+          </MailLayout>
+        ),
         children: [{ path: "template/mail", element: <TemplateMail /> }],
       },
       { path: "template/auth/v1/login", element: <AuthV1Login /> },
       { path: "template/auth/v1/register", element: <AuthV1Register /> },
       {
-        element: <AuthV2Layout>
-          <Outlet />
-        </AuthV2Layout>,
+        element: (
+          <AuthV2Layout>
+            <Outlet />
+          </AuthV2Layout>
+        ),
         children: [
           { path: "template/auth/v2/login", element: <AuthV2Login /> },
           { path: "template/auth/v2/register", element: <AuthV2Register /> },
@@ -125,9 +128,11 @@ export const router = createHashRouter([
 
       // Stashly's pages and the template dashboard demos, inside the sidebar shell.
       {
-        element: <DashboardShell>
-          <Outlet />
-        </DashboardShell>,
+        element: (
+          <DashboardShell>
+            <Outlet />
+          </DashboardShell>
+        ),
         children: shellRoutes,
       },
 

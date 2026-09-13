@@ -1,6 +1,5 @@
-﻿import { Link } from "react-router";
-
-import { Command } from "lucide-react";
+﻿import { Command } from "lucide-react";
+import { Link } from "react-router";
 
 import { RegisterForm } from "../../_components/register-form";
 import { GoogleButton } from "../../_components/social-auth/google-button";

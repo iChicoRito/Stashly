@@ -96,7 +96,7 @@
       }
     },
     "domains": {
-        "react": "recommended"
+      "react": "recommended"
     }
   },
   "css": {
