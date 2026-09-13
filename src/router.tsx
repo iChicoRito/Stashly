@@ -1,7 +1,8 @@
 import { createHashRouter, Outlet } from "react-router";
 
-import StashlyInventory from "@/app/(app)/page";
-import StashlySettings from "@/app/(app)/settings/page";
+import DevStoragePage from "@/app/(app)/dev/storage/page";
+import DashboardPage from "@/app/(app)/page";
+import SettingsPage from "@/app/(app)/settings/page";
 import TemplateExternal from "@/app/(template)/template/(external)/page";
 import AuthV1Login from "@/app/(template)/template/(main)/auth/v1/login/page";
 import AuthV1Register from "@/app/(template)/template/(main)/auth/v1/register/page";
@@ -41,6 +42,8 @@ import TemplateUnauthorized from "@/app/(template)/template/(main)/unauthorized/
 import RootLayout from "@/app/layout";
 import NotFound from "@/app/not-found";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
+import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
+import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 
 /**
  * Application routes.
@@ -54,10 +57,38 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
  * back to `index.html`. With hashes, every route reloads safely.
  */
 
-/** Stashly's own pages, plus the template's dashboard demos, share the shell. */
+/**
+ * Stashly's own pages, plus the template's dashboard demos, share the shell.
+ *
+ * Stashly's three routes are each wrapped in `OnboardingGate`: it boots `vault-store` once per
+ * mount and decides between the wizard, a retry screen, and the page. They read that store
+ * rather than the API, so the gate's answer is the only `vault_get_state` on the way in.
+ */
 const shellRoutes = [
-  { index: true, element: <StashlyInventory /> },
-  { path: "settings", element: <StashlySettings /> },
+  {
+    index: true,
+    element: (
+      <OnboardingGate>
+        <DashboardPage />
+      </OnboardingGate>
+    ),
+  },
+  {
+    path: "settings",
+    element: (
+      <OnboardingGate>
+        <SettingsPage />
+      </OnboardingGate>
+    ),
+  },
+  {
+    path: "dev/storage",
+    element: (
+      <OnboardingGate>
+        <DevStoragePage />
+      </OnboardingGate>
+    ),
+  },
   { path: "template/dashboard", element: <DashboardIndex /> },
   { path: "template/dashboard/default", element: <DashboardDefault /> },
   { path: "template/dashboard/crm", element: <DashboardCrm /> },
@@ -96,6 +127,7 @@ export const router = createHashRouter([
       // Full-bleed template screens: they carry their own layouts and no sidebar.
       { path: "template", element: <TemplateExternal /> },
       { path: "template/unauthorized", element: <TemplateUnauthorized /> },
+
       {
         element: (
           <ChatLayout>
@@ -125,6 +157,16 @@ export const router = createHashRouter([
           { path: "template/auth/v2/register", element: <AuthV2Register /> },
         ],
       },
+
+      // The first-run wizard, full-bleed: it owns its own chrome, so it is registered outside
+      // the sidebar shell. It is deliberately NOT wrapped in `OnboardingGate`, and that is a
+      // correctness requirement rather than a style choice. `onboarding-wizard.tsx` calls the
+      // vault store's `refresh()` the moment the submission succeeds, which flips the store from
+      // `onboarding` to `ready`, while the completion screen renders from the *onboarding*
+      // store's step and only leaves when the user clicks "Open Stashly →". A gate here would
+      // replace the wizard with the Dashboard as soon as that refresh landed, and T-01's SETUP
+      // COMPLETE screen — the summary the user is meant to read — would never be readable.
+      { path: "onboarding", element: <OnboardingWizard /> },
 
       // Stashly's pages and the template dashboard demos, inside the sidebar shell.
       {
