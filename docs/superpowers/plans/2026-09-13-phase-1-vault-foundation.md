@@ -169,10 +169,16 @@ Folds dependency install, IPC wrapper, and its test into one reviewable unit.
   import { invoke } from "@tauri-apps/api/core";
   import { VaultCommandError, getVaultStartup, completeOnboarding } from "@/lib/vault/api";
 
-  vi.mock("@tauri-apps/api/core", async () => (await import("@/test/mocks/tauri-core")));
+  vi.mock("@tauri-apps/api/core", async () => await import("@/test/mocks/tauri-core"));
 
   const invokeMock = vi.mocked(invoke);
-  beforeEach(() => invokeMock.mockReset());
+  // A block body, not `() => invokeMock.mockReset()`: the concise arrow RETURNS the mock, and
+  // vitest treats a value returned from a hook as teardown, so it would call `invoke()` for real
+  // after every test. Any `mockRejectedValue` still configured then surfaces as an unhandled
+  // rejection attributed to a test whose assertions are actually correct.
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
 
   test("returns the not_initialized startup state unchanged", async () => {
     invokeMock.mockResolvedValue({ status: "not_initialized" });
