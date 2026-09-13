@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { Suspense } from "react";
 
@@ -21,7 +21,7 @@ import { FoldersSection } from "./_components/folders-section";
  * because a static export prerenders every route and cannot await request data.
  */
 function FileManagerContent() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const activeView: FileManagerView = searchParams.get("view") === "list" ? "list" : "grid";
 
   return (
