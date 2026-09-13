@@ -26,4 +26,7 @@ vite.config.d.ts
 *.sln
 *.sw?
 
+# Scratch space for the subagent-driven-development ledger and review packages
+.superpowers/
+
 
