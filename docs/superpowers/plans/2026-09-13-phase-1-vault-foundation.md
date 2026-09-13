@@ -97,18 +97,18 @@ CREATE TABLE IF NOT EXISTS collections (
 ) STRICT;
 ```
 
-Settings keys: `onboarding_completed` (`"0"`/`"1"`), `user_name`, `vault_name`, `storage_mode` (`"local"`), `protection_enabled`, `password_salt`, `password_hash`, `schema_note`.
+Settings keys: `onboarding_completed` (`"0"`/`"1"`), `user_name`, `vault_name`, `storage_mode` (`"local"`), `protection_enabled`, `password_salt`, `password_hash`, and the probe's `probe.<n>.label` / `probe.<n>.created_at`. **That is the complete list** — `onboarding_completed_at` is read from the completion row's `updated_at`, and the schema version lives in `PRAGMA user_version`, so neither needs a key of its own.
 Timestamps are ISO-8601 UTC text written by SQLite's `strftime('%Y-%m-%dT%H:%M:%fZ','now')` (no chrono dependency; the frontend formats with `date-fns`, already installed).
 
 `STRICT` tables + `PRAGMA user_version` give Phase 2+ a clean forward-migration path.
+
+**`migrate` and a newer vault (Phase 2 obligation, decided 13 Sep 2026):** `migrate` reads `user_version` and walks it forward with `while version < SCHEMA_VERSION`. A vault whose `user_version` is *newer* than `SCHEMA_VERSION` therefore skips the loop and is accepted silently. Phase 1 tolerates that because no v2 vault can exist yet, but **the author of the v2 arm must add a `version > SCHEMA_VERSION` guard before the loop**, returning a clear error rather than writing v1-shaped rows through a v2 schema. Nothing else will catch it.
 
 ### 4.2 IPC contract (frozen — frontend and Rust must agree exactly)
 
 ```ts
 // src/lib/vault/types.ts
 export type StorageMode = "local";
-
-export interface VaultIdentity { userName: string; vaultName: string; }
 export interface VaultCollection { id: number; slug: string; name: string; createdAt: string; isStarter: boolean; }
 export type VaultStartup =
   | { status: "not_initialized" }
@@ -125,6 +125,14 @@ export interface StorageProbeResult {
   dbRecordId: number; dbRecordLabel: string; dbRecordCreatedAt: string;
   dbPath: string; vaultRoot: string; filePath: string; fileName: string; fileBytes: number;
 }
+
+// Pinned 13 Sep 2026 after Task 1's review: `src/lib/vault/types.ts` is the
+// authority for these element shapes, and the probe listing's fields are
+// camelCase to match every other Rust response in this contract.
+export interface StorageProbeRecord { id: number; label: string; createdAt: string; }
+export interface StorageProbeFile { name: string; bytes: number; modifiedAt: string; }
+export interface StorageProbeListing { records: StorageProbeRecord[]; files: StorageProbeFile[]; }
+export interface StorageProbePaths { vaultRoot: string; dbPath: string; filesDir: string; }
 ```
 
 | Command | Argument | Returns | Errors |
@@ -257,7 +265,7 @@ Folds dependency install, IPC wrapper, and its test into one reviewable unit.
 
 - [ ] Failing test in `vault.rs`: `validate_submission` rejects an empty / whitespace-only `userName` as `Validation`, accepts a `None` vault name, accepts an empty `starterCollections`, rejects a `masterPassword` shorter than 8 characters and one over 1024, and accepts a submission with no password. (Pure function, no Tauri runtime needed.)
 - [ ] `cargo test` → FAIL.
-- [ ] Implement `vault.rs`: `#[derive(Deserialize)] #[serde(rename_all = "camelCase")] pub struct OnboardingSubmission`, `#[derive(Serialize)] #[serde(rename_all = "camelCase")] pub struct VaultStartupResponse` shaped exactly per §4.2, and the `#[tauri::command]` functions `vault_get_state`, `vault_complete_onboarding`. Both take `State<'_, AppState>`, lock the mutex, and map a poisoned lock to `VaultError::Internal("vault state lock poisoned")`.
+- [ ] Implement `vault.rs`: `#[derive(Deserialize)] #[serde(rename_all = "camelCase")] pub struct OnboardingSubmission` — **import this from `vault_repo`, do not redeclare it** — and `#[derive(Serialize)] pub struct VaultStartupResponse` shaped exactly per §4.2. **`VaultStartupResponse` must carry NO `#[serde(rename_all)]`**: its `ready` fields are deliberately snake_case (`user_name`, `vault_name`, `storage_mode`, `protection_enabled`, `onboarding_completed_at`) because that is what `src/lib/vault/types.ts` declares, and a camelCase rename here would silently break all five with no type error on either side. Nested collections keep their camelCase from `vault_repo::Collection`'s own attribute. Build the response from `vault_repo::vault_state`'s `Option<VaultState>`. Also use `vault_repo::MAX_USER_NAME_LEN` rather than hardcoding a second bound, so the wizard (Task 7) and the command (which calls `validate_submission`) cannot disagree about the limit. Then the `#[tauri::command]` functions `vault_get_state`, `vault_complete_onboarding`. Both take `State<'_, AppState>`, lock the mutex, and map a poisoned lock to `VaultError::Internal("vault state lock poisoned")`.
 - [ ] Rewrite `src-tauri/src/lib.rs`:
   ```rust
   pub fn run() {
@@ -300,7 +308,7 @@ This task exists because D2 assumes `app_data_dir()` resolves to a locally-creat
 
 - [ ] Add the three probe commands in `dev_storage.rs`, registered **only** in debug builds:
   - `vault_probe_write(label)` → inserts a `probe.<n>.label`/`probe.<n>.created_at` record, writes `<files>/probe-<yyyyMMdd-HHmmss>-<n>.txt` containing the label, `dbPath`, and `vaultRoot` (timestamped name, so a repeat never overwrites an earlier probe and persistence is observable), returning `StorageProbeResult`.
-  - `vault_probe_read(limit)` → the last `limit` (default 10, max 50) probe records plus the `files/` listing (name, bytes, modified), sorted newest first.
+  - `vault_probe_read(limit)` → the last `limit` (default 10, max 50) probe records plus the `files/` listing, sorted newest first. **Serialize both element types `#[serde(rename_all = "camelCase")]`**, so a file is `{ name, bytes, modifiedAt }` and a record is `{ id, label, createdAt }` — the frontend reads `modifiedAt`, and §4.2's pinned shapes are authoritative over any earlier wording that said `modified`.
   - `vault_probe_paths()` → `{ vaultRoot, dbPath, filesDir }`.
   Register them under `#[cfg(debug_assertions)]` so release builds cannot expose an arbitrary file writer, keeping the `invoke_handler` lists explicit per branch (no runtime flag).
 - [ ] Rust test for `write_probe_file(dir, label, stamp)`: creates the directory if absent, returns the byte count, and calling it twice with different stamps leaves two files.
@@ -387,6 +395,7 @@ This task exists because D2 assumes `app_data_dir()` resolves to a locally-creat
 - [ ] Execute the R-02 walkthrough and record pass/fail per step: fresh profile → onboarding appears; empty name blocks Continue with a field error; vault name and starter collections skipped successfully; password skipped successfully; **Create My Vault →** shows the summary; **Open Stashly →** lands on the Dashboard; close and reopen → the Dashboard appears directly and onboarding never returns.
 - [ ] Execute the R-01 walkthrough: on the debug probe page click **Write test record and file**, note both, quit the app entirely, relaunch, confirm both the record and the file still appear, and confirm the files exist on disk under the resolved `vaultRoot`.
 - [ ] Write `docs/verification/phase-1/00-summary.md` with: the two walkthroughs and their observed results; the **confirmed** resolved vault root and DB path from Task 5; the exact `cargo`/`npm`/`biome` commands and results; and a plainly-worded limits section stating that **macOS was not built or run on this host** (Windows host, only `x86_64-pc-windows-msvc` installed, no macOS toolchain) and that macOS evidence comes from the Task 11 CI matrix.
+- [ ] **Carry forward every `Ruling:` and `minor (deferred):` line from the execution ledger** (`.superpowers/sdd/2026-09-13-phase-1-vault-foundation/progress.md`) into the summary's deferrals table, so the decisions taken during execution and the minors deliberately parked are visible to the next phase rather than dying with the scratch workspace. Two are specifically required by earlier rulings: the `migrate` `version > SCHEMA_VERSION` guard the v2 author must add before the loop (Ruling 9), and `get_settings_page` being superseded as a Task 3 deliverable (Ruling 14).
 - [ ] Update `ANALYSIS - STASHLY DESKTOP APP/05 - ROADMAP.md`: R-01 and R-02 from ⭕ to 🟨 with a note that the phase is built and awaiting the macOS CI run before ✅; refresh the "Where everything stands" counts; add a "Phase 1 implementation record" section linking `docs/verification/phase-1/00-summary.md` and naming the deferred items in §8.
 - [ ] Update `README.md` with the Phase 1 status, the vault location, the debug probe's existence and debug-only gating, and the test commands.
 - [ ] **Commit:** `docs: record Phase 1 verification evidence and update the roadmap`
