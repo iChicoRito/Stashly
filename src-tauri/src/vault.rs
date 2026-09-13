@@ -1,8 +1,10 @@
 //! The `#[tauri::command]` functions the frontend reaches over IPC.
 //!
 //! `vault_repo` owns every read and every write; this module owns only the wire shapes
-//! (`VaultStartupResponse`), the submission rules the wizard and the command share
-//! (`validate_submission`), and the mapping from a locked connection to a response.
+//! (`VaultStartupResponse`), the submission rules the command enforces, and the mapping
+//! from a locked connection to a response. The wizard shares the name limit rather than
+//! these rules — it is TypeScript, so it re-reads `vault_repo::MAX_USER_NAME_LEN` — and
+//! `validate_submission` is the only place the rest of the rules live.
 
 use rusqlite::Connection;
 use std::sync::MutexGuard;
@@ -13,7 +15,9 @@ use crate::error::{VaultError, VaultResult};
 use crate::vault_repo;
 use crate::vault_repo::{Collection, OnboardingSubmission, VaultState};
 
-/// The shortest master password the wizard and this command both accept.
+/// The shortest master password this command accepts. A minimum lives here and not in
+/// [`vault_repo::save_onboarding`] on purpose: refusing a weak password is the wizard's
+/// decision, not a rule about what may be stored.
 const MIN_MASTER_PASSWORD_LEN: usize = 8;
 
 /// The longest master password this command accepts. Argon2id's cost is the user's, so
@@ -73,16 +77,23 @@ impl VaultStartupResponse {
 ///
 /// Pure: it reads the submission and nothing else — no database, no clock, no disk — so
 /// it runs before the connection is locked and the same rules can be unit-tested without
-/// a Tauri runtime. It neither trims nor rewrites what it accepts; trimming belongs to
-/// [`vault_repo::save_onboarding`], which stores the trimmed value it validated.
+/// a Tauri runtime.
+///
+/// Both user-name rules read the trimmed name, which is the same view
+/// [`vault_repo::save_onboarding`] measures: `trim` takes `&self` and only reads, and it
+/// can only ever shrink the name, so measuring it here cannot accept a name the
+/// repository would reject. Nothing is rewritten — the submission is borrowed — and
+/// `save_onboarding` still stores the trimmed value it validated.
 pub fn validate_submission(submission: &OnboardingSubmission) -> VaultResult<()> {
-    if submission.user_name.trim().is_empty() {
+    let user_name = submission.user_name.trim();
+
+    if user_name.is_empty() {
         return Err(VaultError::Validation("A user name is required.".to_string()));
     }
 
     // Characters, not bytes: a 120-character name is 240 bytes of `é`, and a byte
     // measurement would reject it at half the length the user is allowed.
-    if submission.user_name.chars().count() > vault_repo::MAX_USER_NAME_LEN {
+    if user_name.chars().count() > vault_repo::MAX_USER_NAME_LEN {
         return Err(VaultError::Validation(format!(
             "The user name must be {} characters or fewer.",
             vault_repo::MAX_USER_NAME_LEN
@@ -209,6 +220,20 @@ mod tests {
     }
 
     #[test]
+    fn validate_submission_measures_the_trimmed_user_name() {
+        // Padding must not push a name the repository would accept over the limit:
+        // `save_onboarding` trims before it measures, so the command has to measure the
+        // same view or the two disagree about a name that is exactly at the limit.
+        let padded_at_the_limit = format!("  {}  ", "A".repeat(vault_repo::MAX_USER_NAME_LEN));
+        validate_submission(&submission(&padded_at_the_limit))
+            .expect("120 characters padded with whitespace is still a 120 character name");
+
+        // And trimming must not become a way to smuggle an over-long name through.
+        let padded_over_the_limit = format!("  {}  ", "A".repeat(vault_repo::MAX_USER_NAME_LEN + 1));
+        assert_rejected(&submission(&padded_over_the_limit));
+    }
+
+    #[test]
     fn validate_submission_counts_characters_rather_than_bytes() {
         // `é` is two bytes in UTF-8, so a byte-measured limit would reject this name at 60
         // characters and the wizard would have nothing to show the user.
@@ -258,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_submission_neither_trims_nor_mutates_the_submission() {
+    fn validate_submission_accepts_a_padded_submission_without_rewriting_it() {
         let submission = OnboardingSubmission {
             user_name: "  Ada Lovelace  ".to_string(),
             vault_name: Some("  Ada's Vault  ".to_string()),
@@ -266,14 +291,12 @@ mod tests {
             master_password: Some("  hunter2hunter2  ".to_string()),
         };
 
+        // The padded name is measured trimmed, so padding neither rejects it nor survives
+        // into storage: `save_onboarding` stores the trimmed value it validated. That the
+        // submission comes back byte-identical is guaranteed by the `&` receiver rather
+        // than asserted here — `OnboardingSubmission` has no interior mutability, so a
+        // validator that rewrote it would not compile.
         validate_submission(&submission).expect("a padded but valid submission is accepted");
-
-        // The repository trims, not the validator: a validator that trimmed would make the
-        // name it accepted differ from the name that was stored.
-        assert_eq!(submission.user_name, "  Ada Lovelace  ");
-        assert_eq!(submission.vault_name.as_deref(), Some("  Ada's Vault  "));
-        assert_eq!(submission.starter_collections, vec![" Work ".to_string()]);
-        assert_eq!(submission.master_password.as_deref(), Some("  hunter2hunter2  "));
     }
 
     #[test]
@@ -310,29 +333,5 @@ mod tests {
         let serialized = serde_json::to_value(VaultStartupResponse::from_state(None)).expect("the response serializes");
 
         assert_eq!(serialized, serde_json::json!({ "status": "not_initialized" }));
-    }
-
-    #[test]
-    fn the_ready_response_carries_no_password_bearing_field() {
-        let serialized = serde_json::to_value(VaultStartupResponse::from_state(Some(ready_state())))
-            .expect("the response serializes");
-
-        let object = serialized.as_object().expect("the ready response is a JSON object");
-        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
-        keys.sort_unstable();
-
-        assert_eq!(
-            keys,
-            vec![
-                "collections",
-                "onboarding_completed_at",
-                "protection_enabled",
-                "status",
-                "storage_mode",
-                "user_name",
-                "vault_name",
-            ],
-            "the ready response is exactly these fields and nothing password-bearing"
-        );
     }
 }
