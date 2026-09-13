@@ -53,50 +53,68 @@ impl VaultPaths {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
 
-    /// A distinct temp directory per test: the process id separates concurrent `cargo
-    /// test` runs and the counter separates the tests inside this one. The directory is
-    /// deliberately left uncreated so `ensure` has to create it.
-    fn temp_dir(label: &str) -> PathBuf {
-        static COUNTER: AtomicUsize = AtomicUsize::new(0);
+    /// A distinct, initially absent temp directory per test. The process id separates
+    /// concurrent `cargo test` runs and the counter separates tests inside this one.
+    struct TempDir(PathBuf);
 
-        let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!("stashly-paths-{label}-{}-{unique}", std::process::id()))
+    impl TempDir {
+        fn new(label: &str) -> Self {
+            static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+            let unique = COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = std::env::temp_dir()
+                .join(format!("stashly-paths-{label}-{}-{unique}", std::process::id()));
+            Self(path)
+        }
+
+        fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            if self.0.exists() {
+                if let Err(error) = std::fs::remove_dir_all(&self.0) {
+                    eprintln!("failed to clean up test directory {:?}: {error}", self.0);
+                }
+            }
+        }
     }
 
     #[test]
     fn resolve_lays_out_the_database_file_and_the_files_directory() {
-        let app_data_dir = temp_dir("resolve");
-        assert!(!app_data_dir.exists(), "the test starts without {app_data_dir:?}");
+        let app_data_dir = TempDir::new("resolve");
+        assert!(!app_data_dir.path().exists(), "the test starts without {:?}", app_data_dir.path());
 
-        let paths = resolve(&app_data_dir);
+        let paths = resolve(app_data_dir.path());
 
-        assert_eq!(paths.root, app_data_dir);
-        assert_eq!(paths.db, app_data_dir.join("db").join("stashly.db"));
-        assert_eq!(paths.files, app_data_dir.join("files"));
+        assert_eq!(paths.root, app_data_dir.path());
+        assert_eq!(paths.db, app_data_dir.path().join("db").join("stashly.db"));
+        assert_eq!(paths.files, app_data_dir.path().join("files"));
         // `resolve` is pure, so nothing exists until `ensure` runs.
         assert!(!paths.root.exists(), "resolve must not touch the disk");
     }
 
     #[test]
     fn ensure_creates_the_root_the_database_directory_and_the_files_directory() {
-        let app_data_dir = temp_dir("ensure");
-        let paths = resolve(&app_data_dir);
+        let app_data_dir = TempDir::new("ensure");
+        let paths = resolve(app_data_dir.path());
 
         paths.ensure().expect("the vault directories are created");
 
         assert!(paths.root.is_dir(), "the vault root is created");
         assert!(paths.db.parent().expect("the database path has a parent").is_dir(), "the db directory is created");
         assert!(paths.files.is_dir(), "the files directory is created");
+        assert!(!paths.db.exists(), "ensure must not create the database file");
         assert!(!paths.db.is_dir(), "the database path itself must stay a file path");
 
         // A second launch must not fail on directories that already exist.
         paths.ensure().expect("a second ensure is a no-op");
-
-        std::fs::remove_dir_all(&paths.root).expect("the temp directory is removed");
     }
 }
