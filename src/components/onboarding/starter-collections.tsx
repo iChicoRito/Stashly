@@ -1,71 +1,67 @@
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { STARTER_COLLECTION_OPTIONS } from "@/stores/onboarding/onboarding-schema";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { cn } from "@/lib/utils";
+import { STARTER_COLLECTION_BLURBS, STARTER_COLLECTION_OPTIONS } from "@/stores/onboarding/onboarding-schema";
 
 interface StarterCollectionsProps {
   selected: readonly string[];
   disabled: boolean;
   onToggle: (name: string) => void;
-  onSkip: () => void;
 }
 
 /**
- * T-01 page 3's answer control: the six starter categories, what they are not, and the way
- * past them.
+ * The starter categories as a grid of cards, each one a checkbox with a name and one line
+ * saying what belongs in it.
  *
- * The options come from `STARTER_COLLECTION_OPTIONS` rather than from a list of its own, so
- * the names the user sees, the names the review screen counts, and the names the vault is
- * asked to create cannot drift apart.
+ * The options come from `STARTER_COLLECTION_OPTIONS` and their lines from
+ * `STARTER_COLLECTION_BLURBS`, so the names the user sees, the names the vault is asked to
+ * create, and the sentence under each one cannot drift apart. Nothing here is required and
+ * nothing here is the only way past the screen — the wizard owns the way to skip it.
  */
-export function StarterCollections({ selected, disabled, onToggle, onSkip }: StarterCollectionsProps) {
+export function StarterCollections({ selected, disabled, onToggle }: StarterCollectionsProps) {
   return (
-    <>
-      <FieldDescription>Select all that apply. There is no minimum.</FieldDescription>
+    <div className="grid gap-3 sm:grid-cols-2">
+      {STARTER_COLLECTION_OPTIONS.map((name) => {
+        const id = optionId(name);
+        const checked = selected.includes(name);
 
-      <FieldGroup>
-        {STARTER_COLLECTION_OPTIONS.map((name) => {
-          const id = optionId(name);
-
-          return (
-            <Field key={name} orientation="horizontal">
-              <Checkbox
-                id={id}
-                checked={selected.includes(name)}
-                disabled={disabled}
-                onCheckedChange={() => onToggle(name)}
-              />
-              <FieldLabel htmlFor={id}>{name}</FieldLabel>
-            </Field>
-          );
-        })}
-      </FieldGroup>
-
-      <div className="flex flex-col gap-1">
-        <p className="text-muted-foreground text-sm">These collections are only starting points. You can later:</p>
-        <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-sm">
-          {STARTER_COLLECTION_FREEDOMS.map((freedom) => (
-            <li key={freedom}>{freedom}</li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <Button type="button" variant="ghost" disabled={disabled} onClick={onSkip}>
-          Skip — I'll organize it myself
-        </Button>
-      </div>
-    </>
+        return (
+          <Field
+            key={name}
+            orientation="horizontal"
+            // The highlight is what makes the card the click target rather than the small
+            // box inside it, so a ticked card is legible at a glance from across the grid.
+            className={cn(
+              // Tight across, roomy down: the box and its two lines are all the card holds, and
+              // every pixel of side padding is width taken from the line that sits beside it.
+              "items-center rounded-xl border px-2 py-4 transition-colors",
+              checked ? "border-foreground/25 bg-muted/40" : "border-border",
+            )}
+          >
+            <Checkbox
+              id={id}
+              checked={checked}
+              disabled={disabled}
+              // Named and described by the two lines beside it: read together as one string,
+              // the name would be "Personal Documents IDs and legal papers".
+              aria-labelledby={`${id}-name`}
+              aria-describedby={`${id}-blurb`}
+              onCheckedChange={() => onToggle(name)}
+            />
+            <FieldLabel htmlFor={id} className="flex-col items-start gap-0 font-normal">
+              <span id={`${id}-name`} className="font-medium">
+                {name}
+              </span>
+              <span id={`${id}-blurb`} className="text-muted-foreground">
+                {STARTER_COLLECTION_BLURBS[name]}
+              </span>
+            </FieldLabel>
+          </Field>
+        );
+      })}
+    </div>
   );
 }
-
-/** T-01's list of what a starter collection is not: permanent. */
-const STARTER_COLLECTION_FREEDOMS = [
-  "Rename them",
-  "Delete them",
-  "Reorganize them",
-  "Create additional collections",
-] as const;
 
 /** A stable id per option, so every checkbox is labelled and none depends on its index. */
 function optionId(name: string): string {

@@ -11,8 +11,8 @@ Phase 1 built the vault foundation: a real on-disk vault, first-run setup that p
 | Area | State |
 | --- | --- |
 | Local storage | ✅ Live. SQLite (`rusqlite` with bundled SQLite, `STRICT` tables, `user_version = 1` migrations, WAL) plus a `files/` folder. Rust owns all storage behind named Tauri commands. |
-| First-run setup | ✅ Live. A five-step wizard collects a required user name (vault name, starter collections, and master password are all skippable) and writes the whole submission in one transaction. |
-| Onboarding persistence and gate | ✅ Live. `onboarding_completed = "1"` is stored, and every Stashly route is wrapped in an `OnboardingGate` that routes first launch to the wizard and later launches straight to the Dashboard without remounting. |
+| First-run setup | ✅ Live. A five-step wizard collects a required user name (starter collections and master password are both skippable; the vault is named after the user until it is renamed in Settings) and writes the whole submission in one transaction. |
+| Onboarding persistence and gate | ✅ Live. `onboarding_completed = "1"` is stored, and one `OnboardingGate` wraps the dashboard shell: a vault that does not exist yet is asked for on a full-bleed page of its own instead of inside the sidebar, and later launches go straight to the Dashboard. |
 | Launch decision safety | ✅ Live. A failed or unavailable vault call shows a retry screen and **never** renders the wizard — re-running first-run setup over a live vault is the one failure this design exists to prevent. |
 | Vault protection | 🟨 Partial by design. An optional master password is stored as a **salted Argon2id PHC hash** (never plaintext, never returned to the UI, never logged). **Locking is not implemented** — the Settings card says so and its Vault Lock switch is disabled. |
 | Dashboard and Settings | ✅ Live at `#/` and `#/settings`. The Dashboard shows the greeting, vault summary, a T-01 empty state, and four **disabled** quick actions (Add Note, Add File, Save Link, Create Collection) with the visible note "Quick actions arrive in the next phase." — Phase 1 has no item model, so nothing here fakes item creation. |

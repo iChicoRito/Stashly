@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -14,6 +14,7 @@ import {
   type OnboardingStepId,
 } from "@/stores/onboarding/onboarding-schema";
 import { useOnboardingStore } from "@/stores/onboarding/onboarding-store";
+import { useVaultStore } from "@/stores/vault/vault-store";
 
 vi.mock("@/lib/vault/api", () => ({ getVaultStartup: vi.fn(), completeOnboarding: vi.fn() }));
 
@@ -46,146 +47,119 @@ function renderWizardAt(step: OnboardingStepId, draft: Partial<OnboardingDraft> 
   );
 }
 
-/** T-01's headline for each of the five screens, in T-01's order. */
+/** The headline each of the five screens is recognised by. */
 const STEP_HEADINGS: Record<OnboardingStepId, string> = {
   welcome: "Everything important, in one place.",
   identity: "Make Stashly yours",
   collections: "What will you keep in Stashly?",
   protection: "Keep your vault private",
-  complete: "Your Stash is ready.",
+  complete: "Congrats! Your vault has been created",
 };
 
 describe("OnboardingWizard", () => {
   beforeEach(() => {
     completeOnboardingMock.mockReset();
     getVaultStartupMock.mockReset();
-    // The wizard refreshes the vault store once the vault exists; a resolved read keeps that
-    // refresh out of the failure path this suite is not about.
     getVaultStartupMock.mockResolvedValue(ready);
     useOnboardingStore.setState({ step: "welcome", draft: emptyDraft(), status: "idle", error: null });
+    useVaultStore.setState({ status: "onboarding", startup: null, errorCode: null, errorMessage: null });
   });
 
-  test("walks T-01's five screens in T-01's order", async () => {
+  test("walks the five screens in order and writes the vault on the last of them", async () => {
     const user = userEvent.setup();
     completeOnboardingMock.mockResolvedValue(ready);
     renderWizardAt("welcome");
 
     expect(screen.getByRole("heading", { name: STEP_HEADINGS.welcome })).toBeInTheDocument();
-    expect(screen.getByText("Stored locally on your device")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Get Started →" }));
+    await user.click(screen.getByRole("button", { name: "Get Started" }));
     expect(screen.getByRole("heading", { name: STEP_HEADINGS.identity })).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("What should we call you?"), "Mark Adrianne");
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByRole("heading", { name: STEP_HEADINGS.collections })).toBeInTheDocument();
 
     // T-01 sets no minimum, so Continue works with nothing selected.
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByRole("heading", { name: STEP_HEADINGS.protection })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Create My Vault →" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
     expect(await screen.findByRole("heading", { name: STEP_HEADINGS.complete })).toBeInTheDocument();
     expect(completeOnboardingMock).toHaveBeenCalledTimes(1);
   });
 
-  test("marks the current screen in the progress list as the user moves through it", async () => {
-    const user = userEvent.setup();
-    renderWizardAt("welcome");
+  test("counts no steps and marks no progress", () => {
+    renderWizardAt("collections", NAMED);
 
-    const progress = screen.getByRole("list", { name: "Setup progress" });
-
-    function currentStepLabel(): string {
-      const items = within(progress).getAllByRole("listitem");
-      const current = items.find((item) => item.getAttribute("aria-current") === "step");
-      return current?.textContent ?? "";
-    }
-
-    expect(currentStepLabel()).toContain("Welcome");
-
-    await user.click(screen.getByRole("button", { name: "Get Started →" }));
-
-    expect(currentStepLabel()).toContain("Your vault");
-    expect(within(progress).getAllByRole("listitem")).toHaveLength(5);
+    // The flow is a sequence the user can feel. A row of numbered marks spends the top of
+    // every screen saying so, which is what the design takes away.
+    expect(screen.queryByRole("list", { name: /progress/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/step \d/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\d of \d/)).not.toBeInTheDocument();
   });
 
-  test("advances from the collections screen through the skip affordance, with nothing selected", async () => {
+  test("has nothing to go back to on the first screen", () => {
+    renderWizardAt("welcome");
+
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+  });
+
+  test("goes back to the screen before it", async () => {
     const user = userEvent.setup();
     renderWizardAt("collections", NAMED);
 
-    // The six rows come from `StarterCollections`; this proves the wizard really renders it.
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(useOnboardingStore.getState().step).toBe("identity");
+    expect(screen.getByRole("heading", { name: STEP_HEADINGS.identity })).toBeInTheDocument();
+  });
+
+  test("offers no way back from the completion screen, because the vault exists", () => {
+    renderWizardAt("complete", THREE_COLLECTIONS);
+
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Skip for now" })).not.toBeInTheDocument();
+  });
+
+  test("carries the ticked collections forward from the collections screen", async () => {
+    const user = userEvent.setup();
+    renderWizardAt("collections", NAMED);
+
+    // The six cards come from `StarterCollections`; this proves the wizard really renders it.
     expect(screen.getAllByRole("checkbox")).toHaveLength(6);
 
-    await user.click(screen.getByRole("button", { name: "Skip — I'll organize it myself" }));
+    await user.click(screen.getByRole("checkbox", { name: "Projects" }));
+    await user.click(screen.getByRole("checkbox", { name: "Work" }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
 
-    expect(useOnboardingStore.getState().step).toBe("protection");
-    expect(useOnboardingStore.getState().draft.starterCollections).toEqual([]);
+    expect(useOnboardingStore.getState().draft.starterCollections).toEqual(["Projects", "Work"]);
     expect(screen.getByRole("heading", { name: STEP_HEADINGS.protection })).toBeInTheDocument();
   });
 
-  test("goes back to the previous screen, and has nowhere to go back to on the first", async () => {
+  test("skipping the collections screen creates none of the ticked collections", async () => {
     const user = userEvent.setup();
-    const first = renderWizardAt("welcome");
+    renderWizardAt("collections", THREE_COLLECTIONS);
 
-    expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
-    first.unmount();
+    await user.click(screen.getByRole("button", { name: "Skip for now" }));
 
-    renderWizardAt("collections", NAMED);
-    await user.click(screen.getByRole("button", { name: "Back" }));
-
-    expect(screen.getByRole("heading", { name: STEP_HEADINGS.identity })).toBeInTheDocument();
-    expect(useOnboardingStore.getState().step).toBe("identity");
+    // "Skip" is not "leave the ticked ones behind": a user who chose to skip would otherwise
+    // find three collections waiting in a vault they were told they had skipped.
+    expect(useOnboardingStore.getState().draft.starterCollections).toEqual([]);
+    expect(useOnboardingStore.getState().step).toBe("protection");
   });
 
-  test("reports the setup on the completion screen the way T-01 wrote it", async () => {
+  test("keeps the completion screen on screen after the vault is written", async () => {
     const user = userEvent.setup();
     completeOnboardingMock.mockResolvedValue(ready);
-    renderWizardAt("protection", THREE_COLLECTIONS);
+    renderWizardAt("protection", NAMED);
 
-    await user.click(screen.getByRole("button", { name: "Create My Vault →" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
 
-    expect(await screen.findByText("Your Stash is ready.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Everything is set up. You can start adding and organizing your important information."),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: STEP_HEADINGS.complete })).toBeInTheDocument();
 
-    // Scoped to the summary: the progress list carries some of the same words, and a row of
-    // the summary is what this screen is being judged on.
-    const summary = within(screen.getByRole("region", { name: "Setup summary" }));
-
-    expect(summary.getByText("Name")).toBeInTheDocument();
-    expect(summary.getByText("Mark Adrianne")).toBeInTheDocument();
-    expect(summary.getByText("Vault")).toBeInTheDocument();
-    expect(summary.getByText("Mark Adrianne's Stash")).toBeInTheDocument();
-    expect(summary.getByText("Collections")).toBeInTheDocument();
-    expect(summary.getByText("3 Created")).toBeInTheDocument();
-    expect(summary.getByText("Storage")).toBeInTheDocument();
-    expect(summary.getByText("● This Device")).toBeInTheDocument();
-    expect(summary.getByText("Vault Protection")).toBeInTheDocument();
-    expect(summary.getByText("Not Enabled")).toBeInTheDocument();
-    expect(summary.getByText("You can enable it anytime from Settings.")).toBeInTheDocument();
-
-    expect(screen.getByRole("button", { name: "Open Stashly →" })).toBeInTheDocument();
-  });
-
-  test("reports a typed vault name and enabled protection instead of the skipped ones", async () => {
-    const user = userEvent.setup();
-    completeOnboardingMock.mockResolvedValue(ready);
-    renderWizardAt("protection", {
-      userName: "Mark Adrianne",
-      vaultName: "The Archive",
-      masterPassword: "correct horse",
-      confirmPassword: "correct horse",
-    });
-
-    await user.click(screen.getByRole("button", { name: "Create My Vault →" }));
-
-    const summary = within(await screen.findByRole("region", { name: "Setup summary" }));
-
-    expect(summary.getByText("The Archive")).toBeInTheDocument();
-    expect(summary.getByText("Enabled")).toBeInTheDocument();
-    expect(summary.getByText("None yet")).toBeInTheDocument();
-    expect(summary.queryByText("You can enable it anytime from Settings.")).not.toBeInTheDocument();
+    // Re-reading the vault here would flip the screen the user is reading into the
+    // dashboard. The read belongs to Proceed, which is the control that asks to leave.
+    expect(getVaultStartupMock).not.toHaveBeenCalled();
   });
 
   test("keeps the user on the protection screen with a visible error when the write fails", async () => {
@@ -193,7 +167,7 @@ describe("OnboardingWizard", () => {
     completeOnboardingMock.mockRejectedValue(new VaultCommandError("db", "database or disk is full"));
     renderWizardAt("protection", NAMED);
 
-    await user.click(screen.getByRole("button", { name: "Create My Vault →" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
 
     expect(await screen.findByText(/database or disk is full/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("Your vault was not created.");
@@ -202,7 +176,7 @@ describe("OnboardingWizard", () => {
 
     // The retry path is the control the user already knows, and it still works.
     completeOnboardingMock.mockResolvedValue(ready);
-    await user.click(screen.getByRole("button", { name: "Create My Vault →" }));
+    await user.click(screen.getByRole("button", { name: "Submit" }));
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: STEP_HEADINGS.complete })).toBeInTheDocument();
@@ -210,22 +184,24 @@ describe("OnboardingWizard", () => {
     expect(completeOnboardingMock).toHaveBeenCalledTimes(2);
   });
 
-  test("opens the dashboard from the completion screen", async () => {
+  test("opens the dashboard from the completion screen, and reads the vault on the way", async () => {
     const user = userEvent.setup();
     useOnboardingStore.setState({ step: "complete", draft: THREE_COLLECTIONS, status: "complete", error: null });
 
     render(
-      <MemoryRouter initialEntries={["/onboarding/complete"]}>
+      <MemoryRouter initialEntries={["/setup"]}>
         <Routes>
-          <Route path="/onboarding/complete" element={<OnboardingWizard />} />
+          <Route path="/setup" element={<OnboardingWizard />} />
           <Route path="/" element={<h1>Your Stash is looking a little empty.</h1>} />
         </Routes>
       </MemoryRouter>,
     );
 
-    await user.click(screen.getByRole("button", { name: "Open Stashly →" }));
+    await user.click(screen.getByRole("button", { name: "Proceed" }));
 
-    expect(screen.getByRole("heading", { name: "Your Stash is looking a little empty." })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your Stash is looking a little empty." })).toBeInTheDocument();
+    expect(getVaultStartupMock).toHaveBeenCalledTimes(1);
+    expect(useVaultStore.getState().status).toBe("ready");
   });
 
   test("offers no control, and no wording, for anything T-01 keeps out of onboarding", () => {

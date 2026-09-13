@@ -1,35 +1,29 @@
+import { ScreenHeading } from "@/components/onboarding/onboarding-screen";
 import { StarterCollections } from "@/components/onboarding/starter-collections";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface CollectionsStepProps {
   selected: readonly string[];
   disabled: boolean;
   onToggle: (name: string) => void;
-  onSkip: () => void;
 }
 
 /**
- * T-01's page 3, quoted from the spec: the title and description, then the starter
- * collections the user may take or leave. The choice itself is `StarterCollections`.
+ * The screen that asks what the user expects to keep, and offers to set those categories up
+ * as collections before they arrive.
  *
- * Nothing here is required — T-01 sets no minimum selection, so skipping is as complete an
- * answer as ticking all six boxes.
+ * Nothing here is required — T-01 sets no minimum selection — and the way to skip it lives
+ * in the wizard's action row rather than among the cards, so "none of these" is offered
+ * where the user looks for a way forward, not at the bottom of a list they must read first.
  */
-export function CollectionsStep({ selected, disabled, onToggle, onSkip }: CollectionsStepProps) {
+export function CollectionsStep({ selected, disabled, onToggle }: CollectionsStepProps) {
   return (
-    <>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-2xl">
-          What will you keep in Stashly?
-        </CardTitle>
-        <CardDescription>
-          Choose anything that applies. Stashly can prepare some starter collections for you.
-        </CardDescription>
-      </CardHeader>
+    <div className="flex flex-col gap-4">
+      <ScreenHeading
+        title="What will you keep in Stashly?"
+        description="Choose anything that applies. Stashly can prepare some starter collections for you."
+      />
 
-      <CardContent className="flex flex-col gap-5">
-        <StarterCollections selected={selected} disabled={disabled} onToggle={onToggle} onSkip={onSkip} />
-      </CardContent>
-    </>
+      <StarterCollections selected={selected} disabled={disabled} onToggle={onToggle} />
+    </div>
   );
 }

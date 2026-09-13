@@ -36,6 +36,22 @@ export const STARTER_COLLECTION_OPTIONS = [
   "Images & Media",
 ] as const;
 
+/**
+ * The one line under each category, saying what belongs in it.
+ *
+ * Keyed by the category name itself, so a category added to the list above without a line
+ * here is a type error rather than a card with an empty second half. Each line has to fit
+ * on one line beside its checkbox, which is why they are this short.
+ */
+export const STARTER_COLLECTION_BLURBS: Record<(typeof STARTER_COLLECTION_OPTIONS)[number], string> = {
+  "Personal Documents": "IDs and legal papers",
+  Projects: "Work in progress",
+  Work: "Job files and notes",
+  "Learning & References": "Guides and study notes",
+  "Important Records": "Tax and medical records",
+  "Images & Media": "Photos and video clips",
+};
+
 /** What the wizard's fields hold while the user fills them in. */
 export interface OnboardingDraft {
   userName: string;
@@ -77,11 +93,8 @@ export function isStepComplete(step: OnboardingStepId, draft: OnboardingDraft): 
     case "welcome":
     case "complete":
       return true;
-    case "identity": {
-      // The command and the repository both measure the trimmed name, so this does too.
-      const userName = draft.userName.trim();
-      return userName !== "" && countCodePoints(userName) <= MAX_USER_NAME_LEN;
-    }
+    case "identity":
+      return userNameProblem(draft.userName) === null;
     case "collections":
       // T-01: "There should be no required minimum number of selections" — skipping is a
       // complete answer, not a missing one.
@@ -89,6 +102,27 @@ export function isStepComplete(step: OnboardingStepId, draft: OnboardingDraft): 
     case "protection":
       return isProtectionComplete(draft);
   }
+}
+
+/**
+ * What is wrong with the typed name, or `null` when nothing is.
+ *
+ * Two named problems rather than one boolean, because a blank field and an over-long one
+ * need different sentences: telling someone who typed nothing that their name is too long
+ * is a complaint about an answer they have not given. Which sentence each problem gets is
+ * the step's business; this function only says which problem it is.
+ */
+export type UserNameProblem = "empty" | "too-long";
+
+export function userNameProblem(name: string): UserNameProblem | null {
+  // The command and the repository both measure the trimmed name, so this does too.
+  const trimmed = name.trim();
+
+  if (trimmed === "") {
+    return "empty";
+  }
+
+  return countCodePoints(trimmed) > MAX_USER_NAME_LEN ? "too-long" : null;
 }
 
 /**

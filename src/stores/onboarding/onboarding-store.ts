@@ -41,6 +41,7 @@ interface OnboardingState {
   start: () => void;
   setField: (field: OnboardingStringField, value: string) => void;
   toggleCollection: (name: string) => void;
+  clearCollections: () => void;
   next: () => void;
   back: () => void;
   submit: () => Promise<void>;
@@ -78,6 +79,11 @@ export const useOnboardingStore = create<OnboardingState>()((set, get) => ({
         starterCollections: toggle(state.draft.starterCollections, name),
       },
     })),
+
+  // What "Skip for now" means on the collections screen: not "leave the ticked ones behind",
+  // but "create none of them". Without this, a user who ticked three boxes and then chose to
+  // skip would still have three collections waiting in the vault they were told they skipped.
+  clearCollections: () => set((state) => ({ draft: { ...state.draft, starterCollections: [] } })),
 
   next: () => {
     const { step, draft } = get();

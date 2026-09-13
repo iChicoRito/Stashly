@@ -1,40 +1,17 @@
-import { ReviewStep } from "@/components/onboarding/review-step";
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface CompleteStepProps {
-  userName: string;
-  vaultName: string;
-  collectionCount: number;
-  protectionEnabled: boolean;
-}
+import { ScreenHeading } from "@/components/onboarding/onboarding-screen";
 
 /**
- * T-01's completion screen: the confirmation, then the summary of what was set up.
+ * The screen that closes the flow, and the only one that is not asking for anything.
  *
- * The values are the answers that were just written, so the screen can render the moment
- * `completeOnboarding` resolves instead of waiting for a second read of the vault. The
- * vault itself is authoritative, and the Dashboard shows it from the store.
+ * It confirms one fact — the vault exists — and hands over the way in. What was chosen
+ * along the way is not repeated back: the collections and the password are already in the
+ * vault, and listing them here would ask the user to check work the app has done.
  */
-export function CompleteStep({ userName, vaultName, collectionCount, protectionEnabled }: CompleteStepProps) {
+export function CompleteStep() {
   return (
-    <>
-      <CardHeader>
-        <CardTitle role="heading" aria-level={1} className="text-2xl">
-          Your Stash is ready.
-        </CardTitle>
-        <CardDescription>
-          Everything is set up. You can start adding and organizing your important information.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <ReviewStep
-          userName={userName}
-          vaultName={vaultName}
-          collectionCount={collectionCount}
-          protectionEnabled={protectionEnabled}
-        />
-      </CardContent>
-    </>
+    <ScreenHeading
+      title="Congrats! Your vault has been created"
+      description="Your personal space is ready. Start organizing your notes, files, links, and important information."
+    />
   );
 }

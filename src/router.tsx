@@ -43,7 +43,6 @@ import RootLayout from "@/app/layout";
 import NotFound from "@/app/not-found";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
-import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 
 /**
  * Application routes.
@@ -58,37 +57,22 @@ import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
  */
 
 /**
- * Stashly's own pages, plus the template's dashboard demos, share the shell.
+ * Stashly's own pages.
  *
- * Stashly's three routes are each wrapped in `OnboardingGate`: it boots `vault-store` once per
- * mount and decides between the wizard, a retry screen, and the page. They read that store
- * rather than the API, so the gate's answer is the only `vault_get_state` on the way in.
+ * The three share one `OnboardingGate`, and the gate is placed *outside* the dashboard
+ * shell rather than inside it. That placement is what makes onboarding full-bleed: a user
+ * with no vault yet gets the wizard instead of the shell, so no sidebar and no header are
+ * ever rendered around a first-run screen. One gate rather than one per route also means
+ * moving between these pages no longer re-reads the vault.
  */
-const shellRoutes = [
-  {
-    index: true,
-    element: (
-      <OnboardingGate>
-        <DashboardPage />
-      </OnboardingGate>
-    ),
-  },
-  {
-    path: "settings",
-    element: (
-      <OnboardingGate>
-        <SettingsPage />
-      </OnboardingGate>
-    ),
-  },
-  {
-    path: "dev/storage",
-    element: (
-      <OnboardingGate>
-        <DevStoragePage />
-      </OnboardingGate>
-    ),
-  },
+const appRoutes = [
+  { index: true, element: <DashboardPage /> },
+  { path: "settings", element: <SettingsPage /> },
+  { path: "dev/storage", element: <DevStoragePage /> },
+];
+
+/** The template's demo screens: the same shell, and no vault of Stashly's behind them. */
+const templateShellRoutes = [
   { path: "template/dashboard", element: <DashboardIndex /> },
   { path: "template/dashboard/default", element: <DashboardDefault /> },
   { path: "template/dashboard/crm", element: <DashboardCrm /> },
@@ -158,24 +142,27 @@ export const router = createHashRouter([
         ],
       },
 
-      // The first-run wizard, full-bleed: it owns its own chrome, so it is registered outside
-      // the sidebar shell. It is deliberately NOT wrapped in `OnboardingGate`, and that is a
-      // correctness requirement rather than a style choice. `onboarding-wizard.tsx` calls the
-      // vault store's `refresh()` the moment the submission succeeds, which flips the store from
-      // `onboarding` to `ready`, while the completion screen renders from the *onboarding*
-      // store's step and only leaves when the user clicks "Open Stashly →". A gate here would
-      // replace the wizard with the Dashboard as soon as that refresh landed, and T-01's SETUP
-      // COMPLETE screen — the summary the user is meant to read — would never be readable.
-      { path: "onboarding", element: <OnboardingWizard /> },
+      // Stashly's pages, inside the shell — and the gate outside it, so a vault that does not
+      // exist yet is asked for on a page of its own rather than inside the dashboard.
+      {
+        element: (
+          <OnboardingGate>
+            <DashboardShell>
+              <Outlet />
+            </DashboardShell>
+          </OnboardingGate>
+        ),
+        children: appRoutes,
+      },
 
-      // Stashly's pages and the template dashboard demos, inside the sidebar shell.
+      // The template dashboard demos, inside the same shell and behind no gate at all.
       {
         element: (
           <DashboardShell>
             <Outlet />
           </DashboardShell>
         ),
-        children: shellRoutes,
+        children: templateShellRoutes,
       },
 
       { path: "*", element: <NotFound /> },

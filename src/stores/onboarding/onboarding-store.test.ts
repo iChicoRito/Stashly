@@ -173,6 +173,26 @@ describe("onboarding store", () => {
     });
   });
 
+  describe("clearCollections", () => {
+    test("drops every selection, which is what skipping the screen means", () => {
+      useOnboardingStore.setState({ draft: draft({ starterCollections: ["Projects", "Work"] }) });
+
+      useOnboardingStore.getState().clearCollections();
+
+      expect(useOnboardingStore.getState().draft.starterCollections).toEqual([]);
+    });
+
+    test("leaves every other field alone, so skipping keeps the name that was typed", () => {
+      useOnboardingStore.setState({
+        draft: draft({ userName: "Mark", starterCollections: ["Projects"] }),
+      });
+
+      useOnboardingStore.getState().clearCollections();
+
+      expect(useOnboardingStore.getState().draft.userName).toBe("Mark");
+    });
+  });
+
   describe("setField", () => {
     test("writes the field it is given", () => {
       useOnboardingStore.getState().setField("vaultName", "Mark's Stash");

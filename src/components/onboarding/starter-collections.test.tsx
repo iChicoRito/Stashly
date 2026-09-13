@@ -3,45 +3,59 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 
 import { StarterCollections } from "@/components/onboarding/starter-collections";
-import { STARTER_COLLECTION_OPTIONS } from "@/stores/onboarding/onboarding-schema";
+import { STARTER_COLLECTION_BLURBS, STARTER_COLLECTION_OPTIONS } from "@/stores/onboarding/onboarding-schema";
 
 interface RenderOptions {
   selected?: readonly string[];
   disabled?: boolean;
   onToggle?: (name: string) => void;
-  onSkip?: () => void;
 }
 
-/** The block on its own, so its six options and its skip affordance are testable directly. */
-function renderOptions({ selected = [], disabled = false, onToggle, onSkip }: RenderOptions = {}) {
+/** The grid on its own, so its six cards and their lines are testable without the wizard. */
+function renderOptions({ selected = [], disabled = false, onToggle }: RenderOptions = {}) {
   const toggle = onToggle ?? vi.fn();
-  const skip = onSkip ?? vi.fn();
 
-  render(<StarterCollections selected={selected} disabled={disabled} onToggle={toggle} onSkip={skip} />);
+  render(<StarterCollections selected={selected} disabled={disabled} onToggle={toggle} />);
 
-  return { onToggle: toggle, onSkip: skip };
+  return { onToggle: toggle };
 }
 
 describe("StarterCollections", () => {
-  test("renders T-01's six categories in T-01's order, each one labelled", () => {
+  test("renders T-01's six categories in T-01's order, each one named", () => {
     renderOptions();
 
     const rendered = screen.getAllByRole("checkbox");
 
     expect(rendered).toHaveLength(6);
     // Naming each option and comparing the resolved elements to the DOM order proves both
-    // halves at once: every row has a real accessible name, and the order is the schema's.
+    // halves at once: every card has a real accessible name, and the order is the schema's.
     expect(STARTER_COLLECTION_OPTIONS.map((name) => screen.getByRole("checkbox", { name }))).toEqual(rendered);
   });
 
-  test("says the choice is optional and that the collections are not permanent", () => {
+  test("says what belongs in each one, beside the category rather than instead of it", () => {
     renderOptions();
 
-    expect(screen.getByText("Select all that apply. There is no minimum.")).toBeInTheDocument();
-    expect(screen.getByText("These collections are only starting points. You can later:")).toBeInTheDocument();
-    for (const freedom of ["Rename them", "Delete them", "Reorganize them", "Create additional collections"]) {
-      expect(screen.getByText(freedom)).toBeInTheDocument();
+    for (const name of STARTER_COLLECTION_OPTIONS) {
+      const blurb = STARTER_COLLECTION_BLURBS[name];
+      const card = screen.getByText(blurb);
+
+      expect(card).toBeInTheDocument();
+      // The line sits inside the same card as the box it explains: a name and a sentence
+      // that belong together must not end up in different columns of the grid.
+      expect(card.closest("[data-slot='field']")).toContainElement(screen.getByRole("checkbox", { name }));
     }
+  });
+
+  test("describes each box by its line instead of folding it into the name", () => {
+    renderOptions();
+
+    const checkbox = screen.getByRole("checkbox", { name: "Personal Documents" });
+    const describedBy = checkbox.getAttribute("aria-describedby");
+    const blurb = STARTER_COLLECTION_BLURBS["Personal Documents"];
+
+    // Read as one string the name would be "Personal Documents IDs and legal papers", which
+    // is not a name a screen reader user can act on.
+    expect(document.getElementById(describedBy ?? "")).toHaveTextContent(blurb);
   });
 
   test("shows the selection it is given rather than one of its own", () => {
@@ -61,17 +75,13 @@ describe("StarterCollections", () => {
     expect(onToggle).toHaveBeenCalledWith("Learning & References");
   });
 
-  test("offers the way past every option, as T-01 writes it", async () => {
+  test("toggles from the card's own text, not only from the small box", async () => {
     const user = userEvent.setup();
-    const { onSkip, onToggle } = renderOptions();
+    const { onToggle } = renderOptions();
 
-    const skip = screen.getByRole("button", { name: "Skip — I'll organize it myself" });
-    expect(skip).toHaveAttribute("data-variant", "ghost");
+    await user.click(screen.getByText("Projects"));
 
-    await user.click(skip);
-
-    expect(onSkip).toHaveBeenCalledTimes(1);
-    expect(onToggle).not.toHaveBeenCalled();
+    expect(onToggle).toHaveBeenCalledWith("Projects");
   });
 
   test("stops accepting anything while a write is in flight", () => {
@@ -80,7 +90,5 @@ describe("StarterCollections", () => {
     for (const checkbox of screen.getAllByRole("checkbox")) {
       expect(checkbox).toBeDisabled();
     }
-
-    expect(screen.getByRole("button", { name: "Skip — I'll organize it myself" })).toBeDisabled();
   });
 });

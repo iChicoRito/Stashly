@@ -5,22 +5,32 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { IdentityStep } from "@/components/onboarding/steps/identity-step";
-import { emptyDraft, type OnboardingDraft, type OnboardingStepId } from "@/stores/onboarding/onboarding-schema";
+import {
+  emptyDraft,
+  MAX_USER_NAME_LEN,
+  type OnboardingDraft,
+  type OnboardingStepId,
+} from "@/stores/onboarding/onboarding-schema";
 import { useOnboardingStore } from "@/stores/onboarding/onboarding-store";
 
 vi.mock("@/lib/vault/api", () => ({ getVaultStartup: vi.fn(), completeOnboarding: vi.fn() }));
 
-const USER_NAME_LABEL = "What should we call you?";
-const VAULT_NAME_LABEL = "Name your vault";
-/** The step's one message for an answer the shared `isStepComplete` rejects. */
-const NAME_ERROR = "Enter a name with 120 characters or fewer.";
+const NAME_LABEL = "What should we call you?";
+const CONTINUE = "Continue";
 
 /**
- * The wizard parked on one step with a draft behind it.
+ * The two sentences the field can be given. They are different on purpose: an empty field
+ * is not told its answer is too long.
+ */
+const EMPTY_NAME_ERROR = "Enter your name to continue.";
+const LONG_NAME_ERROR = `Use ${MAX_USER_NAME_LEN} characters or fewer.`;
+
+/**
+ * The wizard parked on a step, which is how the app reaches every step but the first.
  *
- * The step's own Continue control is the wizard's shared footer (T-01 gives every page the
- * same `← Back / Continue →` row), so the step is exercised the way the app wires it rather
- * than through a button the test invented.
+ * The step is exercised through the wizard rather than alone because its Continue control
+ * belongs to the wizard's action row, so driving the real screen is the only way to test
+ * the path the user actually takes.
  */
 function renderWizardAt(step: OnboardingStepId, draft: Partial<OnboardingDraft> = {}) {
   useOnboardingStore.setState({ step, draft: { ...emptyDraft(), ...draft }, status: "idle", error: null });
@@ -37,22 +47,20 @@ describe("IdentityStep", () => {
     useOnboardingStore.setState({ step: "welcome", draft: emptyDraft(), status: "idle", error: null });
   });
 
-  test("blocks Continue on an empty name and says so on the field itself", async () => {
+  test("blocks Continue on an empty name, and says the field is empty", async () => {
     const user = userEvent.setup();
     renderWizardAt("identity");
 
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.click(screen.getByRole("button", { name: CONTINUE }));
 
-    const input = screen.getByLabelText(USER_NAME_LABEL);
+    const input = screen.getByLabelText(NAME_LABEL);
     expect(input).toHaveAttribute("aria-invalid", "true");
-
-    const describedBy = input.getAttribute("aria-describedby") ?? "";
-    expect(describedBy).toContain("onboarding-user-name-error");
 
     // The id really points at the message: an association that resolves to nothing reads as
     // no error at all to assistive technology.
-    const error = document.getElementById("onboarding-user-name-error");
-    expect(error).toHaveTextContent(NAME_ERROR);
+    const describedBy = input.getAttribute("aria-describedby") ?? "";
+    expect(describedBy).toContain("onboarding-user-name-error");
+    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(EMPTY_NAME_ERROR);
 
     expect(useOnboardingStore.getState().step).toBe("identity");
     expect(screen.getByRole("heading", { name: "Make Stashly yours" })).toBeInTheDocument();
@@ -62,19 +70,19 @@ describe("IdentityStep", () => {
     const user = userEvent.setup();
     renderWizardAt("identity");
 
-    await user.type(screen.getByLabelText(USER_NAME_LABEL), "   ");
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.type(screen.getByLabelText(NAME_LABEL), "   ");
+    await user.click(screen.getByRole("button", { name: CONTINUE }));
 
     expect(useOnboardingStore.getState().step).toBe("identity");
-    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(NAME_ERROR);
+    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(EMPTY_NAME_ERROR);
   });
 
   test("advances to the collections step once a name is typed", async () => {
     const user = userEvent.setup();
     renderWizardAt("identity");
 
-    await user.type(screen.getByLabelText(USER_NAME_LABEL), "Mark Adrianne");
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.type(screen.getByLabelText(NAME_LABEL), "Mark Adrianne");
+    await user.click(screen.getByRole("button", { name: CONTINUE }));
 
     expect(useOnboardingStore.getState().step).toBe("collections");
     expect(screen.getByRole("heading", { name: "What will you keep in Stashly?" })).toBeInTheDocument();
@@ -84,52 +92,53 @@ describe("IdentityStep", () => {
     const user = userEvent.setup();
     renderWizardAt("identity");
 
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.click(screen.getByRole("button", { name: CONTINUE }));
     expect(document.getElementById("onboarding-user-name-error")).not.toBeNull();
 
-    await user.type(screen.getByLabelText(USER_NAME_LABEL), "M");
+    await user.type(screen.getByLabelText(NAME_LABEL), "M");
 
-    expect(screen.queryByText(NAME_ERROR)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(USER_NAME_LABEL)).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText(EMPTY_NAME_ERROR)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(NAME_LABEL)).toHaveAttribute("aria-invalid", "false");
   });
 
   test("reports the schema's length bound on a name that is too long", async () => {
     const user = userEvent.setup();
-    renderWizardAt("identity", { userName: "M".repeat(121) });
+    renderWizardAt("identity", { userName: "M".repeat(MAX_USER_NAME_LEN + 1) });
 
-    await user.click(screen.getByRole("button", { name: "Continue →" }));
+    await user.click(screen.getByRole("button", { name: CONTINUE }));
 
     // The bound is the schema's, not this component's: 121 code points is longer than
     // `MAX_USER_NAME_LEN`, so the shared predicate rejects it and the field says so.
     expect(useOnboardingStore.getState().step).toBe("identity");
-    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(NAME_ERROR);
+    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(LONG_NAME_ERROR);
   });
 
-  test("derives the optional vault name from the name as it is typed", async () => {
-    const user = userEvent.setup();
+  test("asks for the name and nothing else", () => {
+    // The vault is called after the user until they rename it in Settings, so this screen
+    // has no second field, no helper line under the first one, and no storage disclosure.
     renderWizardAt("identity");
 
-    const vault = screen.getByLabelText(VAULT_NAME_LABEL);
-    expect(vault).toHaveAttribute("placeholder", "My Stash");
-
-    await user.type(screen.getByLabelText(USER_NAME_LABEL), "Mark Adrianne");
-
-    expect(vault).toHaveAttribute("placeholder", "Mark Adrianne's Stash");
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.queryByLabelText(/vault/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/this device/i)).not.toBeInTheDocument();
   });
 
-  test("renders a typed vault name and the derivation of an empty one", () => {
-    render(
-      <IdentityStep
-        userName="Mark Adrianne"
-        vaultName=""
-        showNameError={false}
-        onUserNameChange={vi.fn()}
-        onVaultNameChange={vi.fn()}
-      />,
-    );
+  test("renders the name it is given", () => {
+    render(<IdentityStep userName="Mark Adrianne" nameError={null} onUserNameChange={vi.fn()} />);
 
-    expect(screen.getByLabelText(VAULT_NAME_LABEL)).toHaveValue("");
-    expect(screen.getByLabelText(VAULT_NAME_LABEL)).toHaveAttribute("placeholder", "Mark Adrianne's Stash");
-    expect(screen.getByText(/your vault is called Mark Adrianne's Stash/)).toBeInTheDocument();
+    expect(screen.getByLabelText(NAME_LABEL)).toHaveValue("Mark Adrianne");
+  });
+
+  test("reports every keystroke to the caller", async () => {
+    const user = userEvent.setup();
+    const onUserNameChange = vi.fn();
+
+    render(<IdentityStep userName="" nameError={null} onUserNameChange={onUserNameChange} />);
+
+    await user.type(screen.getByLabelText(NAME_LABEL), "Mark");
+
+    // The step owns no state: each keystroke goes to the store and comes back as the value.
+    expect(onUserNameChange).toHaveBeenCalledTimes(4);
+    expect(onUserNameChange).toHaveBeenLastCalledWith("k");
   });
 });

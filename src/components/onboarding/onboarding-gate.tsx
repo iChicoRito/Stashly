@@ -13,7 +13,13 @@ interface OnboardingGateProps {
 }
 
 /**
- * Decides, once per route, whether the app or the first-run wizard is on screen.
+ * Decides whether the app or the first-run wizard is on screen.
+ *
+ * It wraps the dashboard shell rather than sitting inside it, and that placement is the
+ * whole reason onboarding looks like onboarding: a user with no vault yet gets one blank
+ * page and one question, not a sidebar full of collections they have not created and a
+ * header full of controls that do nothing. Wrapping the shell also means one gate rather
+ * than one per route, so moving between pages no longer re-reads the vault.
  *
  * The rule this component exists to enforce: only a `not_initialized` reply opens the
  * wizard. A read that failed — a `db` or `io` error, a poisoned lock, a missing Tauri
@@ -27,11 +33,12 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
   const errorMessage = useVaultStore((state) => state.errorMessage);
   const boot = useVaultStore((state) => state.boot);
 
-  // React 19's StrictMode runs mount effects twice, and every route carries this gate, so
-  // without the guard a development launch would ask Rust for the vault state twice. A ref
-  // rather than a module-level flag: the flag would outlive the component and stop a later
-  // mount (a route change, or a fresh test) from ever booting again. Two named states rather
-  // than a boolean, which also keeps the guard readable as "has the read been asked for yet".
+  // React 19's StrictMode runs mount effects twice, and this gate outlives every route it
+  // guards, so without the guard a development launch would ask Rust for the vault state
+  // twice. A ref rather than a module-level flag: the flag would outlive the component and
+  // stop a later mount (a fresh test, or a remount after the failure screen) from ever
+  // booting again. Two named states rather than a boolean, which also keeps the guard
+  // readable as "has the read been asked for yet".
   const request = useRef<"none" | "asked">("none");
 
   useEffect(() => {
@@ -60,29 +67,27 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
   return <BootFailure code={errorCode} message={errorMessage} onRetry={boot} />;
 }
 
-/** Enough shape for the shell not to jump when the page it is waiting for arrives. */
+/**
+ * What is on screen while the vault is being read: the shape of a page, and nothing that
+ * belongs to one of the answers the read can produce.
+ *
+ * The gate sits above the dashboard shell, so this is what the app shows before it knows
+ * whether there is a vault — and on a first launch the next thing to appear is onboarding,
+ * not a dashboard. A skeleton drawn as a dashboard would promise a screen that never comes.
+ */
 function GateSkeleton() {
   return (
-    <div className="flex w-full flex-col gap-6 p-6">
-      <p className="sr-only" role="status">
-        Opening your vault…
-      </p>
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-8 w-56" />
-        <Skeleton className="h-4 w-80 max-w-full" />
+    <main className="flex min-h-svh flex-col items-center justify-center bg-background px-6 py-16">
+      <div className="flex w-full max-w-[52rem] flex-col gap-3">
+        <p className="sr-only" role="status">
+          Opening your vault…
+        </p>
+        <Skeleton className="h-10 w-2/5" />
+        <Skeleton className="h-8 w-full" />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {SKELETON_CARDS.map((card) => (
-          <Skeleton key={card} className="h-24 w-full" />
-        ))}
-      </div>
-      <Skeleton className="h-40 w-full" />
-    </div>
+    </main>
   );
 }
-
-/** Stable keys for the placeholder cards, so nothing here depends on an array index. */
-const SKELETON_CARDS = ["identity", "collections", "storage", "protection"] as const;
 
 interface BootFailureProps {
   code: string | null;
