@@ -151,7 +151,10 @@ export function OnboardingWizard() {
         <IdentityStep
           userName={draft.userName}
           vaultName={draft.vaultName}
-          showNameError={attemptedStep === "identity"}
+          // Both halves matter: the user asked to continue, and the answer still is not one
+          // the vault can be created from. Measuring the draft again is what lets the error
+          // clear itself the moment the field is fixed.
+          showNameError={attemptedStep === "identity" && !isStepComplete("identity", draft)}
           onUserNameChange={(value) => setField("userName", value)}
           onVaultNameChange={(value) => setField("vaultName", value)}
         />
@@ -172,7 +175,7 @@ export function OnboardingWizard() {
         <ProtectionStep
           password={draft.masterPassword}
           confirmPassword={draft.confirmPassword}
-          showPasswordError={attemptedStep === "protection"}
+          showPasswordError={attemptedStep === "protection" && !isStepComplete("protection", draft)}
           disabled={submitting}
           onPasswordChange={(value) => setField("masterPassword", value)}
           onConfirmPasswordChange={(value) => setField("confirmPassword", value)}

@@ -12,6 +12,8 @@ vi.mock("@/lib/vault/api", () => ({ getVaultStartup: vi.fn(), completeOnboarding
 
 const USER_NAME_LABEL = "What should we call you?";
 const VAULT_NAME_LABEL = "Name your vault";
+/** The step's one message for an answer the shared `isStepComplete` rejects. */
+const NAME_ERROR = "Enter a name with 120 characters or fewer.";
 
 /**
  * The wizard parked on one step with a draft behind it.
@@ -50,7 +52,7 @@ describe("IdentityStep", () => {
     // The id really points at the message: an association that resolves to nothing reads as
     // no error at all to assistive technology.
     const error = document.getElementById("onboarding-user-name-error");
-    expect(error).toHaveTextContent("The user's name is required.");
+    expect(error).toHaveTextContent(NAME_ERROR);
 
     expect(useOnboardingStore.getState().step).toBe("identity");
     expect(screen.getByRole("heading", { name: "Make Stashly yours" })).toBeInTheDocument();
@@ -64,7 +66,7 @@ describe("IdentityStep", () => {
     await user.click(screen.getByRole("button", { name: "Continue →" }));
 
     expect(useOnboardingStore.getState().step).toBe("identity");
-    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent("The user's name is required.");
+    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(NAME_ERROR);
   });
 
   test("advances to the collections step once a name is typed", async () => {
@@ -87,8 +89,20 @@ describe("IdentityStep", () => {
 
     await user.type(screen.getByLabelText(USER_NAME_LABEL), "M");
 
-    expect(screen.queryByText("The user's name is required.")).not.toBeInTheDocument();
+    expect(screen.queryByText(NAME_ERROR)).not.toBeInTheDocument();
     expect(screen.getByLabelText(USER_NAME_LABEL)).toHaveAttribute("aria-invalid", "false");
+  });
+
+  test("reports the schema's length bound on a name that is too long", async () => {
+    const user = userEvent.setup();
+    renderWizardAt("identity", { userName: "M".repeat(121) });
+
+    await user.click(screen.getByRole("button", { name: "Continue →" }));
+
+    // The bound is the schema's, not this component's: 121 code points is longer than
+    // `MAX_USER_NAME_LEN`, so the shared predicate rejects it and the field says so.
+    expect(useOnboardingStore.getState().step).toBe("identity");
+    expect(document.getElementById("onboarding-user-name-error")).toHaveTextContent(NAME_ERROR);
   });
 
   test("derives the optional vault name from the name as it is typed", async () => {

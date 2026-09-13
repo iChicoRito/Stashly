@@ -13,16 +13,27 @@ const PASSWORD_INPUT_ID = "onboarding-master-password";
 const PASSWORD_HELP_ID = "onboarding-master-password-help";
 const PASSWORD_ERROR_ID = "onboarding-master-password-error";
 const CONFIRM_INPUT_ID = "onboarding-confirm-password";
-const CONFIRM_ERROR_ID = "onboarding-confirm-password-error";
 
-const TOO_SHORT = `Use at least ${MIN_MASTER_PASSWORD_LEN} characters.`;
-const TOO_LONG = `Use ${MAX_MASTER_PASSWORD_LEN} characters or fewer.`;
-const MISMATCH = "The two passwords do not match.";
+/**
+ * One message for the one thing this step can be told is wrong.
+ *
+ * A too-short password, a too-long one, a confirmation that does not match, and a
+ * confirmation left blank all mean the same thing to the user — the pair is not usable, and
+ * leaving both fields empty is the way to skip. The wizard's `isStepComplete` decides
+ * *whether* to say it, so the rule itself is not restated here; the bounds appear only in
+ * the sentence, and because both fields share the message, either can be the one to fix.
+ */
+const PASSWORD_ERROR =
+  `Use ${MIN_MASTER_PASSWORD_LEN}–${MAX_MASTER_PASSWORD_LEN} characters and matching passwords, ` +
+  "or leave both fields empty to skip.";
 
 interface ProtectionStepProps {
   password: string;
   confirmPassword: string;
-  /** Set once the user has asked to create the vault from this step. */
+  /**
+   * True only while this step's answer is incomplete and the user has asked to create the
+   * vault. Computed by the wizard from the shared `isStepComplete` predicate.
+   */
   showPasswordError: boolean;
   /** True while `completeOnboarding` is in flight; every control here stops accepting input. */
   disabled: boolean;
@@ -51,9 +62,8 @@ export function ProtectionStep({
   // property of this screen, not an answer about the vault, and it must not outlive it.
   const [revealed, setRevealed] = useState(false);
 
-  const mismatch = showPasswordError && password !== confirmPassword && confirmPassword !== "" ? MISMATCH : null;
-  const lengthError = showPasswordError && password !== "" ? lengthMessage(password) : null;
   const inputType = revealed ? "text" : "password";
+  const describedBy = showPasswordError ? `${PASSWORD_HELP_ID} ${PASSWORD_ERROR_ID}` : PASSWORD_HELP_ID;
 
   return (
     <>
@@ -69,7 +79,7 @@ export function ProtectionStep({
 
       <CardContent className="flex flex-col gap-5">
         <FieldGroup>
-          <Field>
+          <Field data-invalid={showPasswordError}>
             <FieldLabel htmlFor={PASSWORD_INPUT_ID}>Master Password</FieldLabel>
             <Input
               id={PASSWORD_INPUT_ID}
@@ -77,17 +87,17 @@ export function ProtectionStep({
               value={password}
               autoComplete="new-password"
               disabled={disabled}
-              aria-invalid={lengthError !== null}
-              aria-describedby={lengthError === null ? PASSWORD_HELP_ID : `${PASSWORD_HELP_ID} ${PASSWORD_ERROR_ID}`}
+              aria-invalid={showPasswordError}
+              aria-describedby={describedBy}
               onChange={(event) => onPasswordChange(event.target.value)}
             />
             <FieldDescription id={PASSWORD_HELP_ID}>
               At least {MIN_MASTER_PASSWORD_LEN} characters. Leave this empty to skip it for now.
             </FieldDescription>
-            {lengthError !== null && <FieldError id={PASSWORD_ERROR_ID}>{lengthError}</FieldError>}
+            {showPasswordError && <FieldError id={PASSWORD_ERROR_ID}>{PASSWORD_ERROR}</FieldError>}
           </Field>
 
-          <Field>
+          <Field data-invalid={showPasswordError}>
             <FieldLabel htmlFor={CONFIRM_INPUT_ID}>Confirm Password</FieldLabel>
             <Input
               id={CONFIRM_INPUT_ID}
@@ -95,11 +105,12 @@ export function ProtectionStep({
               value={confirmPassword}
               autoComplete="new-password"
               disabled={disabled}
-              aria-invalid={mismatch !== null}
-              aria-describedby={mismatch === null ? undefined : CONFIRM_ERROR_ID}
+              // Described by the same message: the pair is wrong, and this step cannot tell
+              // which half the user needs to change.
+              aria-invalid={showPasswordError}
+              aria-describedby={showPasswordError ? PASSWORD_ERROR_ID : undefined}
               onChange={(event) => onConfirmPasswordChange(event.target.value)}
             />
-            {mismatch !== null && <FieldError id={CONFIRM_ERROR_ID}>{mismatch}</FieldError>}
           </Field>
         </FieldGroup>
 
@@ -139,20 +150,4 @@ export function ProtectionStep({
       </CardContent>
     </>
   );
-}
-
-/**
- * The rule `isStepComplete` applies to this step, in words.
- *
- * Two empty fields are not an error — that is T-01's skipped password — and the mismatch is
- * checked first because it is the one the user caused most recently.
- */
-function lengthMessage(password: string): string | null {
-  const length = [...password].length;
-
-  if (length < MIN_MASTER_PASSWORD_LEN) {
-    return TOO_SHORT;
-  }
-
-  return length > MAX_MASTER_PASSWORD_LEN ? TOO_LONG : null;
 }

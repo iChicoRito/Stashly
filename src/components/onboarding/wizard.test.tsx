@@ -109,6 +109,20 @@ describe("OnboardingWizard", () => {
     expect(within(progress).getAllByRole("listitem")).toHaveLength(5);
   });
 
+  test("advances from the collections screen through the skip affordance, with nothing selected", async () => {
+    const user = userEvent.setup();
+    renderWizardAt("collections", NAMED);
+
+    // The six rows come from `StarterCollections`; this proves the wizard really renders it.
+    expect(screen.getAllByRole("checkbox")).toHaveLength(6);
+
+    await user.click(screen.getByRole("button", { name: "Skip — I'll organize it myself" }));
+
+    expect(useOnboardingStore.getState().step).toBe("protection");
+    expect(useOnboardingStore.getState().draft.starterCollections).toEqual([]);
+    expect(screen.getByRole("heading", { name: STEP_HEADINGS.protection })).toBeInTheDocument();
+  });
+
   test("goes back to the previous screen, and has nowhere to go back to on the first", async () => {
     const user = userEvent.setup();
     const first = renderWizardAt("welcome");

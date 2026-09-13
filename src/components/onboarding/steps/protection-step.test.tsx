@@ -26,6 +26,8 @@ const ready: VaultStartup = {
 const PASSWORD_LABEL = "Master Password";
 const CONFIRM_LABEL = "Confirm Password";
 const CREATE = "Create My Vault →";
+/** The step's one message for any answer the shared `isStepComplete` rejects. */
+const PASSWORD_ERROR = "Use 8–1024 characters and matching passwords, or leave both fields empty to skip.";
 
 /** The wizard parked on a step, which is how the app reaches every step but the first. */
 function renderWizardAt(step: OnboardingStepId, draft: Partial<OnboardingDraft> = {}) {
@@ -91,7 +93,7 @@ describe("ProtectionStep", () => {
     expect(completeOnboardingMock).toHaveBeenCalledWith(expect.objectContaining({ masterPassword: null }));
   });
 
-  test("blocks Create My Vault on a mismatched confirmation, with the error on the field", async () => {
+  test("blocks Create My Vault on a mismatched confirmation, with the error on the fields", async () => {
     const user = userEvent.setup();
     renderWizardAt("protection", { userName: "Mark Adrianne" });
 
@@ -101,10 +103,33 @@ describe("ProtectionStep", () => {
 
     expect(completeOnboardingMock).not.toHaveBeenCalled();
     expect(useOnboardingStore.getState().step).toBe("protection");
+    expect(describedText(screen.getByLabelText(PASSWORD_LABEL))).toContain(PASSWORD_ERROR);
 
+    // Both fields share the message: the pair is what is wrong, and the step cannot tell
+    // which half the user meant to change.
     const confirm = screen.getByLabelText(CONFIRM_LABEL);
     expect(confirm).toHaveAttribute("aria-invalid", "true");
-    expect(describedText(confirm)).toContain("The two passwords do not match.");
+    expect(describedText(confirm)).toContain(PASSWORD_ERROR);
+  });
+
+  test("blocks Create My Vault when the password is long enough but the confirmation is blank", async () => {
+    const user = userEvent.setup();
+    renderWizardAt("protection", { userName: "Mark Adrianne" });
+
+    // Exactly the minimum, and nothing in the confirmation: a pair the command would reject,
+    // which the step has to point at before it is ever sent.
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "12345678");
+    await user.click(screen.getByRole("button", { name: CREATE }));
+
+    expect(completeOnboardingMock).not.toHaveBeenCalled();
+    expect(useOnboardingStore.getState().step).toBe("protection");
+
+    const password = screen.getByLabelText(PASSWORD_LABEL);
+    const confirm = screen.getByLabelText(CONFIRM_LABEL);
+    expect(password).toHaveAttribute("aria-invalid", "true");
+    expect(confirm).toHaveAttribute("aria-invalid", "true");
+    expect(describedText(password)).toContain(PASSWORD_ERROR);
+    expect(describedText(confirm)).toContain(PASSWORD_ERROR);
   });
 
   test("blocks Create My Vault on a password under the command's minimum", async () => {
@@ -117,7 +142,23 @@ describe("ProtectionStep", () => {
     expect(completeOnboardingMock).not.toHaveBeenCalled();
     const password = screen.getByLabelText(PASSWORD_LABEL);
     expect(password).toHaveAttribute("aria-invalid", "true");
-    expect(describedText(password)).toContain("Use at least 8 characters.");
+    expect(describedText(password)).toContain(PASSWORD_ERROR);
+  });
+
+  test("clears the error as soon as the pair is one the vault can be created from", async () => {
+    const user = userEvent.setup();
+    completeOnboardingMock.mockResolvedValue(ready);
+    renderWizardAt("protection", { userName: "Mark Adrianne" });
+
+    await user.type(screen.getByLabelText(PASSWORD_LABEL), "correct horse");
+    await user.type(screen.getByLabelText(CONFIRM_LABEL), "correct hors");
+    await user.click(screen.getByRole("button", { name: CREATE }));
+    expect(screen.queryByText(PASSWORD_ERROR)).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(CONFIRM_LABEL), "e");
+
+    expect(screen.queryByText(PASSWORD_ERROR)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(CONFIRM_LABEL)).toHaveAttribute("aria-invalid", "false");
   });
 
   test("counts characters, not UTF-16 units, so an emoji password is measured like Rust measures it", async () => {
@@ -125,12 +166,12 @@ describe("ProtectionStep", () => {
     renderWizardAt("protection", { userName: "Mark Adrianne" });
 
     // Four characters, eight UTF-16 units: `vault_complete_onboarding` rejects this, so the
-    // step has to reject it here rather than at submit with nothing to point at.
+    // shared predicate has to reject it too rather than measuring `.length`.
     await typeMatchingPasswords(user, "🔒🔒🔒🔒");
     await user.click(screen.getByRole("button", { name: CREATE }));
 
     expect(completeOnboardingMock).not.toHaveBeenCalled();
-    expect(document.getElementById("onboarding-master-password-error")).toHaveTextContent("Use at least 8 characters.");
+    expect(describedText(screen.getByLabelText(PASSWORD_LABEL))).toContain(PASSWORD_ERROR);
   });
 
   test("creates the vault once both passwords match", async () => {
