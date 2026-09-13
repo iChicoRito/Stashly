@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
-import { getStorageProbePaths, getVaultStartup, readStorageProbe } from "@/lib/vault/api";
-import type { StorageProbeListing, StorageProbePaths, VaultStartup } from "@/lib/vault/types";
+import { getVaultStartup } from "@/lib/vault/api";
+import type { VaultStartup } from "@/lib/vault/types";
 import { emptyDraft } from "@/stores/onboarding/onboarding-schema";
 import { useOnboardingStore } from "@/stores/onboarding/onboarding-store";
 import { useVaultStore } from "@/stores/vault/vault-store";
@@ -15,21 +15,9 @@ import { useVaultStore } from "@/stores/vault/vault-store";
 vi.mock("@/lib/vault/api", () => ({
   getVaultStartup: vi.fn(),
   completeOnboarding: vi.fn(),
-  getStorageProbePaths: vi.fn(),
-  readStorageProbe: vi.fn(),
-  writeStorageProbe: vi.fn(),
 }));
 
 const getVaultStartupMock = vi.mocked(getVaultStartup);
-
-/**
- * The dashboard carries the storage probe's panel in a development build, and the panel
- * reads back what earlier runs wrote. Empty rather than absent, so rendering the real
- * dashboard here is about the shell and the gate and not about the panel's contents.
- */
-const NO_PROBE_RECORDS: StorageProbeListing = { records: [], files: [] };
-
-const PROBE_PATHS: StorageProbePaths = { vaultRoot: "", dbPath: "", filesDir: "" };
 
 // Every route is eagerly imported, so the first `import("@/router")` in this file compiles the
 // whole app tree — template demos included. That is why the tests below carry a timeout: the
@@ -81,8 +69,6 @@ describe("router", () => {
   // teardown function and then calls after every test.
   beforeEach(() => {
     getVaultStartupMock.mockReset();
-    vi.mocked(readStorageProbe).mockResolvedValue(NO_PROBE_RECORDS);
-    vi.mocked(getStorageProbePaths).mockResolvedValue(PROBE_PATHS);
     useVaultStore.setState({ status: "loading", startup: null, errorCode: null, errorMessage: null });
     useOnboardingStore.setState({ step: "welcome", draft: emptyDraft(), status: "idle", error: null });
   });
@@ -101,7 +87,7 @@ describe("router", () => {
       // would re-read the vault on every move between pages.
       expect(gatedCount).toBe(1);
       expect(wrappedChild(gated)).toBe(DashboardShell);
-      expect(gated?.children?.map((route) => route.path ?? "(index)")).toEqual(["(index)", "settings", "dev/storage"]);
+      expect(gated?.children?.map((route) => route.path ?? "(index)")).toEqual(["(index)"]);
 
       // The template demos keep the same shell and take no gate: no vault of Stashly's stands
       // behind them.
@@ -129,14 +115,21 @@ describe("router", () => {
     expect(screen.queryByRole("heading", { name: "Dashboard" })).not.toBeInTheDocument();
   });
 
-  test("shows the dashboard, inside its shell, once the vault is ready", async () => {
+  test("shows the app inside its shell, and nothing else, once the vault is ready", async () => {
     const { router } = await import("@/router");
     getVaultStartupMock.mockResolvedValue(READY);
 
-    render(<RouterProvider router={router} />);
+    const { container } = render(<RouterProvider router={router} />);
 
-    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Toggle Sidebar" })).toBeInTheDocument();
     expect(document.querySelector("[data-slot='sidebar']")).not.toBeNull();
     expect(screen.queryByText(WELCOME_HEADING)).not.toBeInTheDocument();
+
+    // The Dashboard holds no content of its own yet: the pane the page renders into — the
+    // shell's header is the sibling above it — is empty rather than describing a product the
+    // vault cannot hold.
+    const pane = container.querySelector("[data-slot='sidebar-inset'] > header")?.nextElementSibling;
+    expect(pane?.textContent?.trim()).toBe("");
+    expect(pane?.children.length).toBe(0);
   });
 });

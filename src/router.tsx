@@ -1,8 +1,6 @@
 import { createHashRouter, Outlet } from "react-router";
 
-import DevStoragePage from "@/app/(app)/dev/storage/page";
 import DashboardPage from "@/app/(app)/page";
-import SettingsPage from "@/app/(app)/settings/page";
 import TemplateExternal from "@/app/(template)/template/(external)/page";
 import AuthV1Login from "@/app/(template)/template/(main)/auth/v1/login/page";
 import AuthV1Register from "@/app/(template)/template/(main)/auth/v1/register/page";
@@ -59,17 +57,12 @@ import { OnboardingGate } from "@/components/onboarding/onboarding-gate";
 /**
  * Stashly's own pages.
  *
- * The three share one `OnboardingGate`, and the gate is placed *outside* the dashboard
- * shell rather than inside it. That placement is what makes onboarding full-bleed: a user
- * with no vault yet gets the wizard instead of the shell, so no sidebar and no header are
- * ever rendered around a first-run screen. One gate rather than one per route also means
- * moving between these pages no longer re-reads the vault.
+ * One route reaches the app itself, and it shares the `OnboardingGate` above the dashboard
+ * shell: the gate is placed *outside* the shell rather than inside it, and that placement is
+ * what makes onboarding full-bleed — a user with no vault yet gets the wizard instead of the
+ * shell, so no sidebar and no header are ever rendered around a first-run screen.
  */
-const appRoutes = [
-  { index: true, element: <DashboardPage /> },
-  { path: "settings", element: <SettingsPage /> },
-  { path: "dev/storage", element: <DevStoragePage /> },
-];
+const appRoutes = [{ index: true, element: <DashboardPage /> }];
 
 /** The template's demo screens: the same shell, and no vault of Stashly's behind them. */
 const templateShellRoutes = [

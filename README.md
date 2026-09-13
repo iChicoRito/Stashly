@@ -11,12 +11,12 @@ Phase 1 built the vault foundation: a real on-disk vault, first-run setup that p
 | Area | State |
 | --- | --- |
 | Local storage | ✅ Live. SQLite (`rusqlite` with bundled SQLite, `STRICT` tables, `user_version = 1` migrations, WAL) plus a `files/` folder. Rust owns all storage behind named Tauri commands. |
-| First-run setup | ✅ Live. A five-step wizard collects a required user name (starter collections and master password are both skippable; the vault is named after the user until it is renamed in Settings) and writes the whole submission in one transaction. |
-| Onboarding persistence and gate | ✅ Live. `onboarding_completed = "1"` is stored, and one `OnboardingGate` wraps the dashboard shell: a vault that does not exist yet is asked for on a full-bleed page of its own instead of inside the sidebar, and later launches go straight to the Dashboard. |
+| First-run setup | ✅ Live. A five-step wizard collects a required user name (starter collections and master password are both skippable; the vault is named after the user) and writes the whole submission in one transaction. |
+| Onboarding persistence and gate | ✅ Live. `onboarding_completed = "1"` is stored, and one `OnboardingGate` wraps the dashboard shell: a vault that does not exist yet is asked for on a full-bleed page of its own instead of inside the sidebar, and later launches go straight to the app. |
 | Launch decision safety | ✅ Live. A failed or unavailable vault call shows a retry screen and **never** renders the wizard — re-running first-run setup over a live vault is the one failure this design exists to prevent. |
-| Vault protection | 🟨 Partial by design. An optional master password is stored as a **salted Argon2id PHC hash** (never plaintext, never returned to the UI, never logged). **Locking is not implemented** — the Settings card says so and its Vault Lock switch is disabled. |
-| Dashboard and Settings | ✅ Live at `#/` and `#/settings`. The Dashboard shows the greeting, vault summary, a T-01 empty state, and four **disabled** quick actions (Add Note, Add File, Save Link, Create Collection) with the visible note "Quick actions arrive in the next phase." — Phase 1 has no item model, so nothing here fakes item creation. |
-| Debug storage probe | ✅ Live but debug-only, at `#/dev/storage`. Writes one SQLite record and one vault file, then lists both back from disk along with the three resolved paths. The three Rust commands are `#[cfg(debug_assertions)]` and the UI is `import.meta.env.DEV`-gated, so a release build contains neither. |
+| Vault protection | 🟨 Partial by design. An optional master password is stored as a **salted Argon2id PHC hash** (never plaintext, never returned to the UI, never logged). **Locking is not implemented**, and nothing in the app shows the vault's protection state yet. |
+| Dashboard | ⬜ Empty on purpose, at `#/`. It renders no content: Phase 1 has no item model, so counts, a summary, and the four T-01 quick actions would describe a product the vault cannot hold. The route stays because it is where first-run setup hands over. |
+| Debug storage probe | 🟨 Rust only. The three probe commands are still `#[cfg(debug_assertions)]` and tested, but they have **no UI and no route**: the panel and its `#/dev/storage` page were removed, leaving `src/lib/vault/api.ts`'s three wrappers with no caller. |
 | Cross-platform bundles | 🟨 Configured, unverified. `bundle.targets` is `["nsis","dmg","app"]` and `.github/workflows/build.yml` builds both platforms. See “Evidence status”. |
 
 ## Stack
@@ -66,17 +66,17 @@ The plan's Phase 5 work relocates this one directory; that capability (R-18) is 
 | `src-tauri/tauri.conf.json` | `frontendDist: "../dist"` | Tauri embeds the built assets in the binary |
 | `src-tauri/tauri.conf.json` | `devUrl: http://localhost:1420` | Must match `vite.config.ts`, which uses `strictPort` so the port cannot drift |
 
-**A hash router is used on purpose.** The built app is loaded from Tauri's custom protocol, where no server can resolve a deep path like `/settings` back to `index.html`. With hashes, every route reloads safely.
+**A hash router is used on purpose.** The built app is loaded from Tauri's custom protocol, where no server can resolve a deep path like `/template/dashboard/crm` back to `index.html`. With hashes, every route reloads safely.
 
-**Stashly's own routes** are `#/` (Dashboard), `#/settings`, `#/dev/storage` (debug only), and the ungated `#/onboarding` wizard. The wizard sits outside the sidebar shell and deliberately outside the gate: its submit refreshes the vault store, and a gate there would replace the completion summary before it can be read.
+**Stashly has one route of its own**: `#/`, the Dashboard, which `OnboardingGate` either hands to the shell or replaces with the first-run wizard. The wizard has no route of its own — the gate renders it in place, so there is no address that opens setup over a vault that already exists.
 
 Everything is offline by design: all 18 template fonts are self-hosted (`@fontsource-variable/*`, plus one woff2 in `public/fonts/`), and there are no runtime CDN calls on Stashly's own pages.
 
 ## What is Stashly versus the template
 
-- **Stashly's pages**: `#/` (Dashboard) and `#/settings` in `src/app/(app)/`, plus the wizard in `src/components/onboarding/`, sharing the template's sidebar shell.
+- **Stashly's pages**: `#/` (Dashboard) in `src/app/(app)/`, plus the wizard in `src/components/onboarding/`, sharing the template's sidebar shell.
 - **The template's pages** are all still here, reachable under `#/template/...` — 11 dashboards plus legacy variants, mail, chat, calendar, kanban, invoice, profile, users, roles, file manager, and the auth screens.
-- **The sidebar** has a "Stashly" group at the top (`src/navigation/sidebar/sidebar-items.ts`) holding exactly `Dashboard` and `Settings`. The debug probe entry lives in a separate `Developer` group that only exists in development builds.
+- **The sidebar** has a "Stashly" group at the top (`src/navigation/sidebar/sidebar-items.ts`) holding exactly `Dashboard`, above the template's demo tree.
 - **Demo identity is rebranded**: `APP_CONFIG` is Stashly and `src/data/users.ts` is a single "Local session" identity. The old session-only demo prototype (fake inventory rows and its store) has been deleted.
 
 ## Commands
@@ -86,22 +86,24 @@ npm install          # install dependencies
 npm run dev          # Vite dev server on http://localhost:1420 (browser only: no Tauri, so vault calls fail and the gate shows its retry screen)
 npm run tauri dev    # the native desktop app, hot reloading
 npm run typecheck    # tsc --noEmit
-npm test             # vitest run — 150 tests in 14 files
+npm test             # vitest run — 142 tests in 11 files
 npm run build        # tsc --noEmit && vite build, into dist/
 npm run tauri build  # native bundles, filtered to what the host platform can produce
 npm run check        # biome check, repo-wide (see the note below — this is RED today)
 ```
 
-`npm run check` is **not** a clean gate in this repo. The template tree carries pre-existing Biome debt that Phase 1 does not own: a bare `npx biome check src/app` reports 1 error, 19 warnings and 4 infos across 216 files and exits 1. Use the scoped command instead — the same one CI runs, which is green over 38 files:
+`npm run check` is **not** a clean gate in this repo. The template tree carries pre-existing Biome debt that Phase 1 does not own: a bare `npx biome check src/app` reports 1 error, 19 warnings and 4 infos across 216 files and exits 1. Use the scoped command instead — the same one CI runs, which is green over 34 files:
 
 ```powershell
 npx biome check src/lib/vault src/stores/onboarding src/stores/vault src/components/onboarding `
-  src/components/dev src/navigation/sidebar src/test `
-  "src/app/(app)/page.tsx" "src/app/(app)/settings/page.tsx" `
-  "src/app/(app)/dashboard-page.test.tsx" "src/app/(app)/settings-page.test.tsx" `
+  src/navigation/sidebar src/test `
+  "src/app/(app)/page.tsx" `
   src/router.tsx src/router.test.tsx src/app/not-found.tsx `
-  "src/app/(template)/template/(main)/dashboard/_components/sidebar/app-sidebar.tsx"
+  "src/app/(template)/template/(main)/dashboard/_components/sidebar/app-sidebar.tsx" `
+  "src/app/(template)/template/(main)/dashboard/_components/sidebar/search-dialog.tsx"
 ```
+
+Every path above has to exist: Biome exits 1 with "No files were processed" if one does not, so a directory or page deleted from the app has to be deleted from this list in the same change.
 
 The parenthesised paths are quoted because the default shell on the GitHub Windows runner is PowerShell.
 

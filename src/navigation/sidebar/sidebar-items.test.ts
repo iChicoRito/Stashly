@@ -7,17 +7,17 @@ function urlsOf(group: NavGroup): string[] {
 }
 
 describe("sidebar navigation", () => {
-  test("lists Stashly's own routes first", () => {
+  test("lists Stashly's own route first", () => {
     const group = sidebarItems[0];
 
     expect(group.label).toBe("Stashly");
-    expect(group.items.map((item) => item.title)).toEqual(["Dashboard", "Settings"]);
+    expect(group.items.map((item) => item.title)).toEqual(["Dashboard"]);
   });
 
   test("points at the routes the app exports", () => {
     const urls = sidebarItems[0].items.map((item) => ("url" in item ? item.url : undefined));
 
-    expect(urls).toEqual(["/", "/settings"]);
+    expect(urls).toEqual(["/"]);
   });
 
   test("dropped the prototype's Inventory register", () => {
@@ -27,27 +27,19 @@ describe("sidebar navigation", () => {
   });
 
   test("keeps the template's demo routes reachable below Stashly's", () => {
-    const templateUrls = sidebarItems
-      .slice(1)
-      .filter((group) => group.label !== "Developer")
-      .flatMap((group) => urlsOf(group));
+    const templateUrls = sidebarItems.slice(1).flatMap((group) => urlsOf(group));
 
     expect(templateUrls.length).toBeGreaterThan(10);
     expect(templateUrls.every((url) => url.startsWith("/template"))).toBe(true);
   });
 
-  test("confines the DEV storage probe to the Developer group", () => {
-    const developerGroups = sidebarItems.filter((group) => group.label === "Developer");
+  test("carries no entry for a page Stashly does not have", () => {
+    // Every entry has to land somewhere: a nav item pointing at a route the router does not
+    // export is a dead link in a window with no address bar to fall back on.
+    const stashlyUrls = urlsOf(sidebarItems[0]);
 
-    for (const group of developerGroups) {
-      expect(urlsOf(group)).toEqual(["/dev/storage"]);
-    }
-
-    // The group is appended by a conditional spread, so it is present in DEV
-    // and absent from a release build. Vitest pins DEV to true even under
-    // `--mode production`, so this asserts each environment's expected shape
-    // rather than exercising both; the release build's static `false` replaces
-    // the spread at bundle time (see sidebar-items.ts).
-    expect(developerGroups).toHaveLength(import.meta.env.DEV ? 1 : 0);
+    expect(stashlyUrls).not.toContain("/settings");
+    expect(stashlyUrls).not.toContain("/dev/storage");
+    expect(sidebarItems.some((group) => group.label === "Developer")).toBe(false);
   });
 });
