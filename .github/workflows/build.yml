@@ -1,0 +1,115 @@
+name: build
+
+# Phase 1 cross-platform bundle gate (roadmap R-01: "on both Windows and macOS").
+#
+# This matrix is the ONLY mechanism that produces a macOS bundle. The development
+# host is Windows with a single installed Rust target (x86_64-pc-windows-msvc), and
+# Tauri's macOS bundling needs macOS plus the Xcode toolchain, so adding
+# `rustup target add aarch64-apple-darwin` there would change nothing.
+#
+# Deliberately absent: secrets, code signing, notarization, publishing. Phase 1 needs
+# none of them, and none of them could be verified from a Windows host.
+
+on:
+  push:
+    branches: [main, phase-1-vault-foundation]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Both platforms must be attempted even when one fails, otherwise a Windows
+      # failure cancels the macOS job and the platform this gate exists for never runs.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Matches the toolchain the vault phase was developed and tested against
+          # (local Node is v24.15.0; Vite 8 requires >= 20.19 / 22.12).
+          node-version: 24
+          cache: npm
+
+      # `dtolnay/rust-toolchain` has no `@vN` release tag — `@stable` is its
+      # documented ref and is what pins the toolchain channel to stable.
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      # Rust runs before the cheap JS gates because it is the only check here that
+      # can fail for a reason no JS-side gate can see: a broken schema migration, a
+      # poisoned lock, or a misplaced serde rename that compiles on both sides of
+      # the IPC seam and still returns `undefined` to the frontend.
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Frontend tests
+        run: npm test
+
+      # SCOPED ON PURPOSE — do NOT "fix" this into a bare `npx biome check`.
+      # The repo-wide run is currently RED on pre-existing src/app/(template)/** lint
+      # debt (2 errors, 19 warnings) that Phase 1 does not own and must not be blocked
+      # on. This step names exactly the directories Phase 1 created or changed. Widen
+      # the list as later phases adopt the files they touch; replacing it with a
+      # repo-wide run turns CI red on debt this phase did not create.
+      - name: Lint (Phase 1 scope)
+        run: >-
+          npx biome check
+          src/lib/vault
+          src/stores/onboarding
+          src/stores/vault
+          src/components/onboarding
+          src/components/dev
+          src/navigation/sidebar
+          src/test
+
+      - name: Build bundles
+        run: npm run tauri build
+
+      # `if-no-files-found: error` is load-bearing: without it an empty upload passes
+      # green, which is exactly how a missing macOS bundle would go unnoticed.
+      #
+      # One list covers both platforms because Tauri filters `bundle.targets` down to
+      # what the host can produce before it bundles anything: on Windows the configured
+      # ["nsis","dmg","app"] becomes [nsis], and on macOS it becomes [app, dmg]. So the
+      # Windows job matches only the nsis pattern and the macOS job only the dmg and
+      # macos ones. `*.app/**` names the app bundle's contents rather than the directory,
+      # so the artifact keeps the `Stashly.app/Contents/...` layout instead of relying on
+      # directory-matching behaviour.
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: stashly-${{ matrix.os }}
+          path: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app/**
+          if-no-files-found: error
