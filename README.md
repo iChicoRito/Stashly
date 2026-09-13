@@ -124,7 +124,7 @@ Phase 1's verification record, including the deferred items handed to later phas
 | Typecheck, 150/150 frontend tests, scoped Biome over 38 files, 64/64 Rust tests, and `cargo clippy --all-targets -- -D warnings` | Captured command logs at commit `b14b9ce`, all exit 0 |
 | The vault layout above | Direct filesystem listing: `db\stashly.db` plus WAL/SHM, and an empty `files\` |
 | Tauri resolves the Roaming `%APPDATA%` root | Observed on disk, with `npm run tauri -- info` exit 0 and no identifier warning |
-| Windows installer | ❌ **Not evidenced.** The captured `npm run tauri build` log stops during Rust compilation and has no final line; only its frontend preflight (`tsc --noEmit` + `vite build`) completed. |
+| Windows installer | ✅ **Evidenced.** A controller-run `npm run tauri build` after `be1bfbe` exited 0 and wrote `src-tauri/target/release/stashly.exe` (9,185,280 B) and `src-tauri/target/release/bundle/nsis/Stashly_0.1.0_x64-setup.exe` (5,500,433 B, modified 2026-09-13 19:14:57). The installer itself was never run — installing it and launching from it is still part of the manual walkthrough below. |
 | The R-01 and R-02 manual walkthroughs | ❌ **Not executed.** No native window was driven, so no probe record, no restart-persistence check, and no screenshots exist. The four planned screenshots were not produced and no placeholders were committed. |
 | macOS | ❌ **Unverified.** This is a Windows host with only `x86_64-pc-windows-msvc` installed and no macOS toolchain, so no `.app` or `.dmg` can be built here. The `macos-latest` arm of `.github/workflows/build.yml` is the only macOS evidence path, and it has not been run. |
 | CI | 🟨 Configured and locally validated, never executed. No workflow run exists for this branch. |

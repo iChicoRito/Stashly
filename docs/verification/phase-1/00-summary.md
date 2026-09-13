@@ -51,7 +51,7 @@ Deleted with the prototype: `src/app/(app)/layout.tsx`, `src/data/stash-items.ts
 
 ## 2. Fresh gate evidence
 
-Captured at `b14b9ce` into `.superpowers/sdd/2026-09-13-phase-1-vault-foundation/task-12-logs/` (git-ignored scratch, so the results are restated here rather than linked).
+Captured at `b14b9ce` into `.superpowers/sdd/2026-09-13-phase-1-vault-foundation/task-12-logs/` (git-ignored scratch, so the results are restated here rather than linked). Gate 09's verdict rests on a later fresh run, logged beside them as `task-12-final-tauri-build.log`.
 
 | # | Gate | Command | Observed result | Verdict |
 |---|---|---|---|---|
@@ -62,7 +62,7 @@ Captured at `b14b9ce` into `.superpowers/sdd/2026-09-13-phase-1-vault-foundation
 | 05 | Clippy | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | `Finished dev profile [unoptimized + debuginfo] target(s) in 0.45s`; `EXIT_CODE=0` | ✅ |
 | 06 | Bundler-less frontend build | `npm run build` (`tsc --noEmit && vite build`) | `✓ 3969 modules transformed`, `✓ built in 1.49s`, `dist/assets/index-Z45NkSW-.js 2,554.39 kB │ gzip: 695.64 kB`; only the over-500 kB chunk advisory; `EXIT_CODE=0` | ✅ |
 | 08 | Tauri environment | `npm run tauri -- info` | Exit 0. tauri 2.11.5, tauri-build 2.6.3, wry 0.55.1, tao 0.35.3, `@tauri-apps/api` 2.11.1, CLI 2.11.4; `frontendDist: ../dist`, `devUrl: http://localhost:1420/`, CSP unset; **no identifier warning** (the pre-rename `.app`-suffix advisory is gone) | ✅ |
-| 09 | Native bundle build | `npm run tauri build` | **No final line and no `EXIT_CODE` marker.** The log runs `Running beforeBuildCommand` → `tsc --noEmit` (no diagnostics) → `vite build` (`✓ built in 1.33s`) and then stops at `Compiling stashly v0.1.0` / `Compiling tauri v2.11.5` | ⚠️ **Incomplete — not a pass** |
+| 09 | Native bundle build | `npm run tauri build` | The Task 12 capture at `b14b9ce` stopped mid-compile — 123 lines, no final line and no `EXIT_CODE` marker, ending at `Compiling stashly v0.1.0` / `Compiling tauri v2.11.5`. A **fresh controller run after `be1bfbe` completed with exit 0**, ending `Finished 1 bundle at: ...\bundle\nsis\Stashly_0.1.0_x64-setup.exe` and `=== EXIT_CODE=0 ===`, and produced `src-tauri\target\release\stashly.exe` (9,185,280 B) and `src-tauri\target\release\bundle\nsis\Stashly_0.1.0_x64-setup.exe` (5,500,433 B, 2026-09-13 19:14:57) | ✅ |
 
 ### 2.1 The exact scoped Biome command
 
@@ -79,7 +79,7 @@ npx biome check src/lib/vault src/stores/onboarding src/stores/vault src/compone
 
 ### 2.2 Precision notes about this evidence
 
-- **`npm run tauri build` did not complete.** The captured log contains 123 lines and no `EXIT_CODE=` line at all, unlike the other seven logs. It ends mid-compile. So the plan's engineering gate "`npm run tauri build` succeeds on Windows" is **not satisfied by this evidence**, and no Windows installer is evidenced for `b14b9ce`. The frontend half of that command did succeed with no TypeScript diagnostics and no Vite errors.
+- **The Task 12 capture of `npm run tauri build` was incomplete; a fresh run of the same command completed.** The captured log contains 123 lines and no `EXIT_CODE=` line at all, unlike the other seven logs, and ends mid-compile. A controller-run `npm run tauri build` performed after `be1bfbe` then finished with **exit 0** — `Finished 1 bundle at: ...\bundle\nsis\Stashly_0.1.0_x64-setup.exe`, `=== EXIT_CODE=0 ===` (log `task-12-final-tauri-build.log`) — and produced `src-tauri\target\release\stashly.exe` (9,185,280 B) and `src-tauri\target\release\bundle\nsis\Stashly_0.1.0_x64-setup.exe` (5,500,433 B, modified 2026-09-13 19:14:57). So the plan's engineering gate "`npm run tauri build` succeeds on Windows" **is satisfied** and a Windows installer **is** evidenced. The earlier capture's frontend half had already succeeded with no TypeScript diagnostics and no Vite errors, and that history is kept here rather than erased.
 - **`cargo clippy`'s log contains a PowerShell `NativeCommandError` block.** That is cargo writing progress to stderr, which PowerShell renders as an error record under `*>&1` redirection; the harness recorded `EXIT_CODE=0` and the only cargo line is `Finished`. It is a redirection artifact, not a clippy finding.
 - **`tauri info` never prints the app identifier.** It reports the environment, packages, plugins, and build settings; the identifier `com.stashly.desktop` is authoritative from `src-tauri/tauri.conf.json` and from the workflow's own validation. The relevant part of the log is the *absence* of the pre-rename macOS advisory warning.
 - **The number series skips `07`.** `task-12-logs/` holds `01`–`06`, `08`, `09`; there is no seventh capture, so nothing is implied for it.
@@ -110,7 +110,7 @@ Two things this settles:
 
 ## 4. Manual walkthroughs — NOT EXECUTED
 
-The native GUI could not be driven in this session. **No probe row was created, no restart-persistence walkthrough was performed, and no screenshots exist.** Both tables below are recorded as *not executed* rather than as passes; the plan's Task 12 acceptance gates for R-01 and R-02 remain open.
+The native GUI could not be driven in this session. **No probe row was created, no restart-persistence walkthrough was performed, and no screenshots exist.** Every GUI step below is recorded as *not executed* rather than as a pass. The only two R-01 rows carrying evidence are non-GUI artefacts — step 7 (filesystem listing, §3) and step 9 (the Windows installer produced by the fresh build, §2 gate 09) — and neither substitutes for a driven window. The plan's Task 12 acceptance gates for R-01 and R-02 remain open, and R-02 is entirely NOT EXECUTED apart from its absence assertion.
 
 ### 4.1 R-01 — cross-platform local foundation
 
@@ -122,9 +122,9 @@ The native GUI could not be driven in this session. **No probe row was created, 
 | 4 | Quit the app entirely | NOT EXECUTED | — |
 | 5 | Relaunch and confirm the record and the file both still appear | NOT EXECUTED | No restart-persistence walkthrough |
 | 6 | Confirm the file exists on disk under the resolved `vaultRoot` | NOT EXECUTED | `files\` is empty, consistent with step 2 never running |
-| 7 | The DB file and `files/` exist under the resolved root | ✅ observed | Filesystem listing in §3 — the only R-01 item with real evidence |
+| 7 | The DB file and `files/` exist under the resolved root | ✅ observed | Filesystem listing in §3 — one of only two R-01 rows carrying evidence, both non-GUI (the other is step 9) |
 | 8 | The resolved path is identical across two launches | NOT EXECUTED | — |
-| 9 | Windows produces `Stashly_0.1.0_x64-setup.exe` | NOT EXECUTED | The `tauri build` log stops mid-compile (§2.2) |
+| 9 | Windows produces `Stashly_0.1.0_x64-setup.exe` | ✅ observed | Fresh `npm run tauri build` exit 0 (§2 gate 09): `src-tauri\target\release\bundle\nsis\Stashly_0.1.0_x64-setup.exe`, 5,500,433 B, modified 2026-09-13 19:14:57. The installer was never *run*, so this is artifact evidence, not an install-and-launch observation |
 | 10 | macOS bundle | NOT EXECUTED | CI matrix defined, never run (§6) |
 | 11 | `DashboardShell` renders on the Dashboard route | NOT EXECUTED | Covered by `router.test.tsx` at the component level, not in a window |
 
@@ -180,9 +180,9 @@ No placeholder, stand-in, or generated image was committed in their place. `docs
 
 No window was opened, no control clicked, no restart performed, no screenshot taken. Every "✅" in §2 is a command result or a filesystem observation; every GUI claim in §4 is explicitly NOT EXECUTED.
 
-### 6.4 Installer — not produced by the captured run
+### 6.4 Installer — produced on Windows; never run
 
-`npm run tauri build` reached `Compiling tauri v2.11.5` and the log has no final line. Whether a fresh installer exists under `src-tauri/target/release/bundle/nsis/` from an earlier run is not established by this evidence and is not claimed.
+`npm run tauri build` exited 0 in a controller run after `be1bfbe`, producing `src-tauri\target\release\stashly.exe` (9,185,280 B) and the NSIS installer `src-tauri\target\release\bundle\nsis\Stashly_0.1.0_x64-setup.exe` (5,500,433 B, modified 2026-09-13 19:14:57). The installer was **not executed**: nothing was installed, and no launch from an installed copy was observed — that remains part of the §4 walkthrough gap. The Task 12 capture of the same command at `b14b9ce` is still incomplete mid-compile (123 lines, no `EXIT_CODE=` line); the fresh run supersedes it as gate evidence, so the installer no longer counts as an open Windows gate. No macOS installer or disk image exists (§6.1).
 
 ### 6.5 Release-artifact containment — partially evidenced
 
@@ -193,6 +193,8 @@ The debug-only probe has strong evidence on the **Rust** side: Task 6's implemen
 ## 7. Durable record of rulings and deferred minors
 
 Carried forward from the execution ledger so the decisions and parked items survive the git-ignored scratch workspace. Statuses: **Resolved** = settled and honoured in the shipped code; **Remaining** = deliberately open, with the owner named.
+
+**Coverage caveat:** this table is complete as to *rulings*, but not every minor could be itemised from the ledger. Task 1 recorded **4 parked minors** and named only 1; Task 3 recorded **4 parked minors** and named none before promoting a fifth item into fix round 1. Those unlisted minors exist as counts only, and §7.2 states that plainly rather than implying a complete list. No missing detail was reconstructed or invented.
 
 ### 7.1 Rulings 1–41
 
@@ -260,9 +262,10 @@ Carried forward from the execution ledger so the decisions and parked items surv
 
 ### 7.3 Open gates for the next phase or the final review
 
-1. **Complete `npm run tauri build` on Windows** and confirm the installer artifact — the captured log stops mid-compile.
-2. **Execute the R-01 and R-02 walkthroughs** with a driven GUI and capture the four screenshots.
-3. **Run the CI matrix** (`windows-latest` + `macos-latest`) — the only macOS evidence path.
-4. **Scan the built frontend output** for the DEV-only probe nav entry and probe route strings (Ruling 37).
-5. **Fix the wrong `vault.rs:7` comment** and the other Task 4 comment/test-name minors (Ruling 9 stays a Phase 2 obligation).
-6. **Add the `version > SCHEMA_VERSION` guard** in `migrate` before the v2 arm is written (Ruling 9).
+1. **Execute the R-01 and R-02 walkthroughs** with a driven GUI and capture the four screenshots.
+2. **Run the CI matrix** (`windows-latest` + `macos-latest`) — the only macOS evidence path.
+3. **Scan the built frontend output** for the DEV-only probe nav entry and probe route strings (Ruling 37).
+4. **Fix the wrong `vault.rs:7` comment** and the other Task 4 comment/test-name minors (Ruling 9 stays a Phase 2 obligation).
+5. **Add the `version > SCHEMA_VERSION` guard** in `migrate` before the v2 arm is written (Ruling 9).
+
+**Closed since the first capture — not a remaining gate:** the Windows `npm run tauri build`. A controller run after `be1bfbe` exited 0 and produced `src-tauri\target\release\stashly.exe` and `src-tauri\target\release\bundle\nsis\Stashly_0.1.0_x64-setup.exe` (§2 gate 09, §6.4). The installer artifact is evidenced; what is still missing on Windows is a *driven* run, which gate 1 above covers.

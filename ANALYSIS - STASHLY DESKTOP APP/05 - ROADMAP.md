@@ -40,9 +40,9 @@ Two capabilities (R-01 and R-02) are built on the `phase-1-vault-foundation` bra
 
 ## Phase 1 implementation record
 
-**Status: 🟨 built, not yet finished.** Both capabilities are implemented and unit-verified on Windows at commit `b14b9ce` on the `phase-1-vault-foundation` branch. Neither is ✅, because the native walkthroughs were not executed and the macOS bundle has never been produced — see the limits below.
+**Status: 🟨 built, not yet finished.** Both capabilities are implemented and unit-verified on Windows at commit `b14b9ce` on the `phase-1-vault-foundation` branch, and the Windows app binary and NSIS installer now build cleanly (evidence below). Neither is ✅, because the native walkthroughs were not executed and the macOS bundle has never been produced — see the limits below.
 
-**Verification summary:** [../docs/verification/phase-1/00-summary.md](../docs/verification/phase-1/00-summary.md) — the implementation inventory, the captured gate evidence with its precision caveats, the two walkthrough tables (marked NOT EXECUTED), the four screenshots (NOT PRODUCED), and the durable table of all 41 execution rulings plus every deferred minor.
+**Verification summary:** [../docs/verification/phase-1/00-summary.md](../docs/verification/phase-1/00-summary.md) — the implementation inventory, the captured gate evidence with its precision caveats, the two walkthrough tables (marked NOT EXECUTED), the four screenshots (NOT PRODUCED), and the durable table of all 41 execution rulings plus the deferred minors. Two ledger minor counts — Task 1's four parked and Task 3's four parked — were recorded as counts only and **cannot be itemised**; only the items the ledger named appear there.
 
 **Where the vault lives now.** Tauri's `app_data_dir()` resolves to the **Roaming** `%APPDATA%` variant, so the final vault root is:
 
@@ -54,7 +54,7 @@ Two capabilities (R-01 and R-02) are built on the `phase-1-vault-foundation` bra
 
 `%LOCALAPPDATA%\com.stashly.desktop\EBWebView` exists too, but it is the WebView2 profile and holds no vault data. The earlier identifier `com.stashly.app` is **superseded**: the rename to `com.stashly.desktop` moved the vault root, the old `%LOCALAPPDATA%\com.stashly.app` directory contains only a WebView2 profile, and **no continuity with any pre-rename directory is claimed**.
 
-**Windows evidence:** typecheck clean, 150/150 frontend tests, the scoped Biome run green over 38 files (the repo-wide run stays red on pre-existing `src/app/(template)/**` debt this phase does not own), 64/64 Rust tests, `cargo clippy --all-targets -- -D warnings` clean, and `npm run tauri build`'s frontend preflight (`tsc --noEmit` + `vite build`) succeeding. **Not evidenced:** the installer — the captured `tauri build` log stops mid-compile with no final line.
+**Windows evidence:** typecheck clean, 150/150 frontend tests, the scoped Biome run green over 38 files (the repo-wide run stays red on pre-existing `src/app/(template)/**` debt this phase does not own), 64/64 Rust tests, `cargo clippy --all-targets -- -D warnings` clean, and `npm run tauri build` **completed with exit 0** in a controller run after `be1bfbe`, writing `src-tauri/target/release/stashly.exe` (9,185,280 B) and `src-tauri/target/release/bundle/nsis/Stashly_0.1.0_x64-setup.exe` (5,500,433 B, modified 2026-09-13 19:14:57). The Task 12 capture of that same command at `b14b9ce` had stopped mid-compile with no final line; the fresh run supersedes it, and that history is kept in the summary rather than erased.
 
 **Remaining limits, stated plainly:**
 
@@ -62,7 +62,7 @@ Two capabilities (R-01 and R-02) are built on the `phase-1-vault-foundation` bra
 |---|---|
 | GUI walkthroughs | No native window was driven. R-01's probe-and-restart walkthrough and R-02's seven-step first-run walkthrough are **NOT EXECUTED**, so neither capability's manual gate has passed. |
 | Screenshots | All four planned images are **NOT PRODUCED**; no placeholders were committed. |
-| `tauri build` | The run did not complete, so no Windows installer is evidenced for `b14b9ce`. |
+| `tauri build` | **Passes on Windows.** A controller run after `be1bfbe` exited 0 and produced the app binary and `Stashly_0.1.0_x64-setup.exe` (paths and sizes above). What is still missing is a *driven* run: the installer was never executed, so no install-and-launch observation exists, and the earlier Task 12 capture of the same command had stopped mid-compile. |
 | macOS | Never built or run: Windows host, only `x86_64-pc-windows-msvc` installed, no macOS toolchain. `.github/workflows/build.yml` (matrix `windows-latest` + `macos-latest`) is the declared mechanism and **has never been executed** — no CI result exists for either platform. |
 | Release-artifact check | The Rust release binary was byte-scanned and contains none of the three probe commands, but the matching scan of the built frontend output for the DEV-only probe nav entry and route was not performed (Ruling 37). |
 | Known limitations | A crash between the record write and the file write cannot be made atomic across the two stores (Q-10, **deferred to Phase 2**); the JS/Rust `trim()` divergence on U+0085 is parked (Ruling 31); `toggleCollection` leaves a stale error (Ruling 35); the `migrate` guard for a vault newer than `SCHEMA_VERSION` is a **Phase 2 obligation** the v2 author must add *before* the loop (Ruling 9). |
@@ -156,7 +156,7 @@ These are also carried as explicit deferrals in the plan's §8 edge-case table. 
 
 ## Implementation handoff
 
-**Phase 1 is built but not closed.** The next actions on R-01/R-02 are the ones listed in “Phase 1 implementation record”: drive the native R-01/R-02 walkthroughs and capture the four screenshots, complete a Windows `tauri build`, and let the `windows-latest` + `macos-latest` CI matrix run — that matrix is the only macOS evidence path, and it has not been executed. Do not mark either capability ✅ before the macOS arm reports, and do not treat the green scoped unit gates as a substitute for the manual walkthroughs.
+**Phase 1 is built but not closed.** The next actions on R-01/R-02 are the ones listed in “Phase 1 implementation record”: drive the native R-01/R-02 walkthroughs and capture the four screenshots, and let the `windows-latest` + `macos-latest` CI matrix run — that matrix is the only macOS evidence path, and it has not been executed. The Windows bundle and installer already build, but producing an installer is not the same as running the app, so neither capability's manual gate has passed. Do not mark either capability ✅ before the macOS arm reports, and do not treat the green scoped unit gates as a substitute for the manual walkthroughs.
 
 For everything after that, select the earliest ⭕ item whose dependencies and blockers are clear. Read its supporting findings in [02 - FINDINGS](02%20-%20FINDINGS.md), proposed arrangement in [03 - SYSTEM ARCHITECTURE](03%20-%20SYSTEM%20ARCHITECTURE.md), relevant picture in [04 - DIAGRAMS](04%20-%20DIAGRAMS.md), and open questions in [00 - START HERE](00%20-%20START%20HERE.md). Phase 2's R-03, R-04, R-05 and R-09 are ❌ on unresolved questions Q-01, Q-03, Q-10 and Q-14, so they are not startable yet.
 
