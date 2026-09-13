@@ -1,5 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+// Public so the vault core is reachable from the crate root. The app's only other
+// entry point is `run()`, so a private module would report every item here as dead
+// code until the Tauri commands are wired up.
+pub mod db;
+pub mod error;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
